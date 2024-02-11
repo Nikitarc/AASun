@@ -18,7 +18,7 @@ La genèse de ce routeur, sa configuration et son utilisation sont expliquées d
 -	Prévu pour être placé sur un support pour rail DIN
 -	Microcontrôleur STM32G071CB et flash externe W25Q64
 -	Afficheur 1.3’’ et 2 boutons pour naviguer dans les pages
--	Interface réseau filaire, serveur WWW pour le monitoring, la configuration du routeur et des règles de routage/forçage, l’affichage des historiques.
+-	Interface réseau filaire, serveur HTTP pour le monitoring, la configuration du routeur et des règles de routage/forçage, l’affichage des historiques.
 -	2 ou 4 capteurs de courant (CT).
 -	2 sorties PWM de routage pour relais statique (SSR).
 -	1 relais 230V 3A sur la carte.
@@ -42,7 +42,7 @@ La genèse de ce routeur, sa configuration et son utilisation sont expliquées d
 
 `AASUN` est un projet utilisable avec l’environnement de développement STM32CubeIDE pour générer le code du routeur.
 
-`mfs/exec_Win32/AASun_web` contient les fichiers du serveur WWW. Ce dossier est transformé en `AASun_web.bin` avec `mfsbuild`. `AASun_web.bin` est le système de fichier MFS à placer dans la flash externe du routeur.
+`mfs/exec_Win32/AASun_web` contient les fichiers du serveur HTTP. Ce dossier est transformé en `AASun_web.bin` avec `mfsbuild`. `AASun_web.bin` est le système de fichier MFS à placer dans la flash externe du routeur.
 
 `mfs` est un projet Visual Studio 2022 qui permet de générer l’application `mfsbuild` qui permet de créer `AASun_web.bin`. Il permet aussi de générer l’application `SerEl` qui permet de flasher ce système de fichier dans la flash externe du routeur par l’intermédiaire d’un UART.
 
