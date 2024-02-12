@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AASun Chart</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="css/index.css">
+
+    <script src="https://cdn.anychart.com/releases/8.11.0/js/anychart-base.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.11.0/js/anychart-exports.min.js"></script>
+    <style type="text/css">
+        html,body,main { height: 100%; }
+        #flex-container { 
+            display: contents; 
+        }
+        #chartContainer { 
+            height: 100%;
+            margin: 10px;  
+        }
+    </style>
+
+</head>
+
+<body>
+  <main>
+    <nav class="navbar">
+        <div class="navbar-fixed">
+          <!-- <a class="navbar-item"> -->
+            <img src="images/a.png" alt="AdAstra" class="logo">
+            <button type="button" class="backButton"><<</button>
+            <button type="button" id="pngButton">PNG</button>
+          <!-- </a> -->
+        </div>
+    </nav>
+    <!-- To push next section under the nav bar -->
+    <div class="navbar-spacer" style="height: 52px;"></div>
+
+        <!-- Modal dialog to display update result -->
+        <dialog id="ackDialog" style="border-radius: 6px; background-color: var(--bgColor); border-Color: var(--fgColor);">
+            <form method="dialog">
+            <p id="ackTitle"   style="text-align:center;"> Title </p>
+            <p id="ackMessage" style="text-align:center;"> Dialog Message </p>
+            <div>
+                <button type="submit" style='display:block; margin:0px auto;'>Close</button>
+            </div>
+            </form>
+          </dialog>
+  
+  
+    <div id="flex-container">
+        <div id="chartContainer">
+        </div>
+    </div>
+
+    <div style="display:block; margin:10px;">
+        <table >
+            <tr>
+                <td style="width:110px;">Legend</td>
+                <td>History 0=yesterday</td>
+            </tr>
+            <tr>
+                <td>
+                    <input type="radio" id="horLegend" name="legendPos" value="hor" checked>
+                    <label for="horLegend" style="display:inline-block;">Horizontal</label>
+                </td>
+                <td>
+                    <input type="number"  class="xx" id="histoDay"
+                            style="width:52px; text-align:right; height:1.4em; font-size: 1em ;">
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <input type="radio" id="vertLegend" name="legendPos" value="vert">
+                    <label for="vertLegend" style="display:inline-block;">Vertical</label>
+                </td>
+                <td>
+                    <button id="lessHistoButton" type="button" class="sendButton smallbutton">-</button>
+                    <button id="moreHistoButton" type="button" class="sendButton smallbutton">+</button>
+                    <button id="getHistoButton"  type="button" class="sendButton getbutton">Get</button>
+                    <button id="getTodayButton"  type="button" class="sendButton getbutton">Today</button>
+                </td>
+            </tr>
+        </table>
+    </div>
+      
+    <footer>
+        <p id="footerText" style="margin:0">AASun by AdAstra-Soft</p>
+    </footer>
+  </main>
+  
+  <script src="js/pchart.js" type="module"></script>
+</body>
+</html>

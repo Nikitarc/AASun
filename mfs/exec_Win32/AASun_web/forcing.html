@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AASun Diverting/Forcing Configuration</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="css/index.css">
+
+    <!-- For roboto font: https://fonts.google.com/specimen/Roboto -->
+    <!-- <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet"> -->
+
+</head>
+
+<body>
+  <main>
+    <nav class="navbar">
+        <div class="navbar-fixed">
+            <img src="images/a.png" alt="AdAstra" class="logo">
+            <button type="button" id="backButton"><<</button>
+            <button type="button" id="reloadButton">Reload</button>
+
+            <!-- Container to put some button on the right -->
+            <div  style="width:100%;">
+                <div style="display: flex ; float:right; padding-right:5px">
+                    <div class="redLed" id="writeLed" style="width:32px; border-radius: 50%;"></div>
+                    <button type="button" id="writeButton">Write</button>
+                </div>
+            </div>
+            
+        </div>
+    </nav>
+    <!-- To push next section under the nav bar -->
+    <div class="navbar-spacer"></div>
+
+    <!-- Modal dialog to display update result -->
+    <dialog id="ackDialog" style="border-radius: 6px; background-color: var(--bgColor); border-Color: var(--fgColor);">
+      <form method="dialog">
+        <p id="ackTitle"   style="text-align:center;"> Title </p>
+        <p id="ackMessage" style="text-align:center;"> Dialog Message </p>
+        <div>
+          <button type="submit" style='display:block; margin:0px auto;'>Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <section class="frame">
+
+      <div class="group groupForceWidth">
+        <p class=" lhw">Diverter is :</p>
+        <button id="divOnOffButton" type="button" value="on" >On</button>
+        <div style="display:flex;align-items: center;">
+            <p class="forceStatusLabel">OUT1 (SSR)</p>
+            <p class="forceStatusValue" id="dfStatus1">.</p>
+        </div>
+        <div style="display:flex;align-items: center;">
+            <p class="forceStatusLabel">OUT2 (SSR)</p>
+            <p class="forceStatusValue" id="dfStatus2">.</p>
+        </div>
+        <div style="display:flex;align-items: center;">
+            <p class="forceStatusLabel">OUT3 (Relay)</p>
+            <p class="forceStatusValue" id="dfStatus3">.</p>
+        </div>
+        <div style="display:flex;align-items: center;">
+            <p class="forceStatusLabel">OUT4 (Digital)</p>
+           <p class="forceStatusValue" id="dfStatus4">.</p>
+        </div>
+        <hr style="margin: 5px 0 20px 0; height: 3px;">
+      </div>
+</div>
+
+      <div class="group">
+          <h1>Diverting 1 (high priority)</h1>
+          <label class="tAreaLabel" for="divRule1">Diverter 1 rule:</label>
+          <br>
+          <textarea class="ruleArea" id="divRule1" rows="3" ></textarea>
+
+          <div style="display:flex;align-items: center;">
+              <div class="greenLed" id="divLed1" data-led="off" style="border-radius: 50%;"></div>
+
+              <div style="width:60%;">
+                <input type="checkbox" id="divOff1" class="checkDis">
+                  <label for="divOff1" >Disabled</label><br>
+              </div>
+              <div style="width:30%;">
+                  <div style="display: flex ; float:right; padding-right:5px;">
+                    <button id="sendDiv1" type="button" class="sendButtonD">Send</button>
+                  </div>
+              </div>
+            </div>
+          </div>
+
+      <div class="group">
+        <h1>Diverting 2 (low priority)</h1>
+        <label class="tAreaLabel" for="divRule2">Diverter 2 rule:</label>
+        <br>
+        <textarea class="ruleArea" id="divRule2" rows="3" ></textarea>
+
+        <div style="display:flex;align-items: center;">
+            <div class="greenLed" id="divLed2" data-led="off"></div>
+
+            <div style="width:60%;">
+              <input type="checkbox" id="divOff2"  class="checkDis">
+              <label for="divOff2" >Disabled</label><br>
+            </div>
+            <div style="width:30%;">
+              <div style="display: flex ; float:right; padding-right:5px;">
+                <button id="sendDiv2" type="button" class="sendButtonD">Send</button>
+              </div>
+            </div>
+        </div>
+        <hr style="margin: 20px 0 20px 0; height: 3px;">
+      </div>
+
+    <div class="group">
+          <h1>Force 1 (highest priority)</h1>
+          <label class="tAreaLabel" for="forceStart1">Start rule:</label>
+          <br>
+          <textarea class="tArea"    id="forceStart1" rows="3" ></textarea>
+
+          <br>
+          <label class="tAreaLabel" for="forceStop1">Stop rule:</label>
+          <br>
+          <textarea class="tArea rStop"  id="forceStop1" rows="2" ></textarea>
+
+          <div style="display:flex;align-items: center;">
+              <div class="greenLed" id="forceLed1" data-led="off"></div>
+              <div style="width:64%;">
+                  <button id="manForce1" type="button" class="manButton">Man</button>
+                  <input type="checkbox" id="forceOff1" class="checkDis">
+                  <label for="forceOff1" >Disabled</label><br>
+              </div>
+              <div style="width:30%;">
+                  <div style="display: flex ; float:right; padding-right:5px;">
+                      <button id="sendForce1" type="button" class="sendButton">Send</button>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <div class="group">
+        <h1>Force 2</h1>
+        <label class="tAreaLabel" for="forceStart2">Start rule:</label>
+        <br>
+        <textarea class="tArea"    id="forceStart2" rows="3" ></textarea>
+
+        <br>
+        <label class="tAreaLabel" for="forceStop2">Stop rule:</label>
+        <br>
+        <textarea class="tArea rStop"  id="forceStop2" rows="2" ></textarea>
+
+        <div style="display:flex;align-items: center;">
+            <div class="greenLed" id="forceLed2" data-led="off"></div>
+            <div style="width:64%;">
+              <button id="manForce2" type="button" class="manButton">Man</button>
+              <input type="checkbox" id="forceOff2" class="checkDis">
+                <label for="forceOff2" >Disabled</label><br>
+            </div>
+            <div style="width:30%;">
+                <div style="display: flex ; float:right; padding-right:5px;">
+                    <button id="sendForce2" type="button" class="sendButton">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="group">
+      <h1>Force 3</h1>
+      <label class="tAreaLabel" for="forceStart3">Start rule:</label>
+      <br>
+      <textarea class="tArea"    id="forceStart3" rows="3" ></textarea>
+
+      <br>
+      <label class="tAreaLabel" for="forceStop3">Stop rule:</label>
+      <br>
+      <textarea class="tArea rStop"  id="forceStop3" rows="2" ></textarea>
+
+      <div style="display:flex;align-items: center;">
+          <div class="greenLed" id="forceLed3" data-led="off"></div>
+          <div style="width:64%;">
+              <button id="manForce3" type="button" class="manButton">Man</button>
+              <input type="checkbox" id="forceOff3" class="checkDis">
+              <label for="forceOff3" >Disabled</label><br>
+          </div>
+          <div style="width:30%;">
+              <div style="display: flex ; float:right; padding-right:5px;">
+                  <button id="sendForce3" type="button" class="sendButton">Send</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <div class="group">
+    <h1>Force 4</h1>
+    <label class="tAreaLabel" for="forceStart4">Start rule:</label>
+    <br>
+    <textarea class="tArea"    id="forceStart4" rows="3" ></textarea>
+
+    <br>
+    <label class="tAreaLabel" for="forceStop4">Stop rule:</label>
+    <br>
+    <textarea class="tArea rStop"  id="forceStop4" rows="2" ></textarea>
+
+    <div style="display:flex;align-items: center;">
+      <div class="greenLed" id="forceLed4" data-led="off"></div>
+      <div style="width:64%;">
+        <button id="manForce4" type="button" class="manButton">Man</button>
+        <input type="checkbox" id="forceOff4" class="checkDis">
+            <label for="forceOff4" >Disabled</label><br>
+        </div>
+        <div style="width:30%;">
+            <div style="display: flex ; float:right; padding-right:5px;">
+                <button id="sendForce4" type="button" class="sendButton">Send</button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <div class="group">
+    <h1>Force 5</h1>
+    <label class="tAreaLabel" for="forceStart5">Start rule:</label>
+    <br>
+    <textarea class="tArea"    id="forceStart5" rows="3" ></textarea>
+
+    <br>
+    <label class="tAreaLabel" for="forceStop5">Stop rule:</label>
+    <br>
+    <textarea class="tArea rStop"  id="forceStop5" rows="2" ></textarea>
+
+    <div style="display:flex;align-items: center;">
+      <div class="greenLed" id="forceLed5" data-led="off"></div>
+      <div style="width:64%;">
+        <button id="manForce5" type="button" class="manButton">Man</button>
+        <input type="checkbox" id="forceOff5" class="checkDis">
+            <label for="forceOff5" >Disabled</label><br>
+        </div>
+        <div style="width:30%;">
+            <div style="display: flex ; float:right; padding-right:5px;">
+                <button id="sendForce5" type="button" class="sendButton">Send</button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <div class="group">
+    <h1>Force 6</h1>
+    <label class="tAreaLabel" for="forceStart6">Start rule:</label>
+    <br>
+    <textarea class="tArea"    id="forceStart6" rows="3" ></textarea>
+
+    <br>
+    <label class="tAreaLabel" for="forceStop6">Stop rule:</label>
+    <br>
+    <textarea class="tArea rStop"  id="forceStop6" rows="2" ></textarea>
+
+    <div style="display:flex;align-items: center;">
+      <div class="greenLed" id="forceLed6" data-led="off"></div>
+        <div style="width:64%;">
+          <button id="manForce6" type="button" class="manButton">Man</button>
+          <input type="checkbox" id="forceOff6" class="checkDis">
+            <label for="forceOff6" >Disabled</label><br>
+        </div>
+        <div style="width:30%;">
+            <div style="display: flex ; float:right; padding-right:5px;">
+                <button id="sendForce6" type="button" class="sendButton">Send</button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <div class="group">
+    <h1>Force 7</h1>
+    <label class="tAreaLabel" for="forceStart7">Start rule:</label>
+    <br>
+    <textarea class="tArea"    id="forceStart7" rows="3" ></textarea>
+
+    <br>
+    <label class="tAreaLabel" for="forceStop7">Stop rule:</label>
+    <br>
+    <textarea class="tArea rStop"  id="forceStop7" rows="2" ></textarea>
+
+    <div style="display:flex;align-items: center;">
+      <div class="greenLed" id="forceLed7" data-led="off"></div>
+        <div style="width:64%;">
+          <button id="manForce7" type="button" class="manButton">Man</button>
+          <input type="checkbox" id="forceOff7" class="checkDis">
+            <label for="forceOff7" >Disabled</label><br>
+        </div>
+        <div style="width:30%;">
+            <div style="display: flex ; float:right; padding-right:5px;">
+                <button id="sendForce7" type="button" class="sendButton">Send</button>
+            </div>
+        </div>
+      </div>
+  </div>
+
+  <div class="group">
+    <h1>Force 8 (lowest priotity)</h1>
+    <label class="tAreaLabel" for="forceStart8">Start rule:</label>
+    <br>
+    <textarea class="tArea"    id="forceStart8" rows="3" ></textarea>
+
+    <br>
+    <label class="tAreaLabel" for="forceStop8">Stop rule:</label>
+    <br>
+    <textarea class="tArea rStop"  id="forceStop8" rows="2" ></textarea>
+
+    <div style="display:flex;align-items: center;">
+      <div class="greenLed" id="forceLed8" data-led="off"></div>
+        <div style="width:64%;">
+          <button id="manForce8" type="button" class="manButton">Man</button>
+          <input type="checkbox" id="forceOff8" class="checkDis">
+            <label for="forceOff8" >Disabled</label><br>
+        </div>
+        <div style="width:30%;">
+            <div style="display: flex ; float:right; padding-right:5px;">
+                <button id="sendForce8" type="button" class="sendButton">Send</button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+</section>
+
+    <footer>
+      <p id="footerText">AASun by AdAstra-Soft</p>
+    </footer>
+  </main>
+  
+  <script src="js/forcing.js" type="module"></script>
+</body>
+</html>

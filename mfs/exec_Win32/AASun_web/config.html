@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AASun Configuration</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="css/index.css">
+
+    <!-- For roboto font: https://fonts.google.com/specimen/Roboto -->
+    <!-- <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet"> -->
+
+</head>
+
+<body>
+  <main>
+    <nav class="navbar">
+        <div class="navbar-fixed">
+            <img src="images/a.png" alt="AdAstra logo letter" class="logo">
+            <button type="button" id="backButton"><<</button>
+            <!-- <button type="button" ihw="stsButton">(GetSts)</button> -->
+            <button type="button" id="reloadButton">Reload Cfg</button>
+
+            <!-- Container to put some button on the right -->
+            <div  style="width:100%;">
+                <div style="display: flex ; float:right; padding-right:5px">
+                    <div class="redLed" id="writeLed" style="width:32px; border-radius: 50%;"></div>
+                    <button type="button" id="writeButton">Write</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <!-- To push next section under the nav bar -->
+    <div class="navbar-spacer"></div>
+
+    <!-- Modal dialog to display update result -->
+    <dialog id="ackDialog" style="border-radius: 6px; background-color: var(--bgColor); border-Color: var(--fgColor);">
+      <form method="dialog">
+        <p id="ackTitle"   style="text-align:center;"> Title </p>
+        <p id="ackMessage" style="text-align:center;"> Dialog Message </p>
+        <div>
+          <button type="submit" style='display:block; margin:0px auto;'>Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <section class="frame">
+
+      <div class="group">
+          <h1>Voltage Calibration</h1>
+          <label  class="lhw" for="vRms">Voltage RMS</label>
+          <output class="ohw"  id="vRms">0</output>
+          <div    class="uItem">V</div> <br>
+
+          <label for="vCal"     class=" lhw">Volt Cal</label>
+          <input type="number"  class=" ihw" id="vCal">
+          <div   class="uItem">-</div> <br>
+
+          <label for="phaseCal" class=" lhw">Phase Cal</label>
+          <input type="number"  class=" ihw" id="phaseCal">
+          <div   class="uItem">-</div> <br>
+            
+          <hr>
+          <button id="sendVolt" type="button" class="sendCfgButton">Send</button>
+      </div>
+
+      <div class="group">
+          <h1>Current Calibration</h1>
+          <label  class="lhw" for="i1Rms">I1 RMS</label>
+          <output class="ohw"  id="i1Rms">0</output>
+          <div    class="uItem">A</div> <br>
+
+          <label for="i1Cal"    class=" lhw">I1 Cal</label>
+          <input type="number"  class=" ihw" id="i1Cal">
+          <div   class="uItem">-</div> <br>
+
+          <label for="i1Offset" class=" lhw">I1 Offset</label>
+          <input type="number"  class=" ihw" id="i1Offset">
+          <div   class="uItem">LSB</div> <br>
+
+          <hr>
+          <label  class="lhw" for="i2Rms">I2 RMS</label>
+          <output class="ohw"  id="i2Rms">0</output>
+          <div    class="uItem">A</div> <br>
+
+          <label for="i2Cal"    class=" lhw">I2 Cal</label>
+          <input type="number"  class=" ihw" id="i2Cal">
+          <div   class="uItem">-</div> <br>
+
+          <label for="i2Offset" class=" lhw">I2 Offset</label>
+          <input type="number"  class=" ihw" id="i2Offset">
+          <div   class="uItem">LSB</div> <br>
+
+          <div class="hide3">
+            <hr>
+            <label  class="lhw" for="i3Rms">I3 RMS</label>
+            <output class="ohw"  id="i3Rms">0</output>
+            <div    class="uItem">A</div> <br>
+
+            <label for="i3Cal"    class=" lhw">I3 Cal</label>
+            <input type="number"  class=" ihw" id="i3Cal">
+            <div   class="uItem">-</div> <br>
+
+            <label for="i3Offset" class=" lhw">I3 Offset</label>
+            <input type="number"  class=" ihw" id="i3Offset">
+            <div   class="uItem">LSB</div> <br>
+          </div>
+
+          <div class="hide4">
+            <hr>
+            <label  class="lhw" for="i4Rms">I4 RMS</label>
+            <output class="ohw"  id="i4Rms">0</output>
+            <div    class="uItem">A</div> <br>
+
+            <label for="i4Cal"    class=" lhw">I4 Cal</label>
+            <input type="number"  class=" ihw" id="i4Cal">
+            <div   class="uItem">-</div> <br>
+
+            <label for="i4Offset" class=" lhw">I4 Offset</label>
+            <input type="number"  class=" ihw" id="i4Offset">
+            <div   class="uItem">LSB</div> <br>
+          </div>
+
+          <hr>
+          <button id="sendCurrent" type="button" class="sendCfgButton">Send</button>
+      </div>
+
+      <div class="group">
+          <h1>Power Calibration</h1>
+          <label  class="lhw" for="p1Real">P1 Real</label>
+          <output class="ohw"  id="p1Real" style="border-color: rgb(211, 2, 2);" >0</output>
+          <div   class="uItem">W</div> <br>
+  
+          <label  class="lhw" for="p1App">P1 Apparent</label>
+          <output class="ohw"  id="p1App">0</output>
+          <div   class="uItem">VA</div> <br>
+  
+          <label  class="lhw" for="cPhi1">Cos Phi 1</label>
+          <output class="ohw"  id="cPhi1">0</output>
+          <div   class="uItem">-</div> <br>
+
+          <label for="p1Cal"    class=" lhw">P1 Cal</label>
+          <input type="number"  class=" ihw" id="p1Cal">
+          <div   class="uItem">-</div> <br>
+  
+          <label for="p1Offset" class=" lhw">P1 Offset</label>
+          <input type="number"  class=" ihw" id="p1Offset">
+          <div   class="uItem">W</div> <br> 
+ 
+          <hr>
+          <label  class="lhw" for="p2Real">P2 Real</label>
+          <output class="ohw"  id="p2Real" style="border-color: rgb(211, 2, 2);" >0</output>
+          <div    class="uItem">W</div> <br>
+  
+          <label  class="lhw" for="p2App">P2 Apparent</label>
+          <output class="ohw"  id="p2App">0</output>
+          <div   class="uItem">VA</div> <br>
+  
+          <label  class="lhw" for="cPhi2">Cos Phi 2</label>
+          <output class="ohw"  id="cPhi2">0</output>
+          <div    class="uItem">-</div> <br>
+
+          <label for="p2Cal"    class=" lhw">P2 Cal</label>
+          <input type="number"  class=" ihw" id="p2Cal">
+          <div   class="uItem">-</div> <br>
+  
+          <label for="p2Offset" class=" lhw">P2 Offset</label>
+          <input type="number"  class=" ihw" id="p2Offset">
+          <div   class="uItem">W</div> <br>
+
+          <div class="hide3">
+            <hr>
+            <label  class="lhw" for="p3Real">P3 Real</label>
+            <output class="ohw"  id="p3Real" style="border-color: rgb(211, 2, 2);" >0</output>
+            <div    class="uItem">W</div> <br>
+    
+            <label  class="lhw" for="p3App">P3 Apparent</label>
+            <output class="ohw"  id="p3App">0</output>
+            <div   class="uItem">VA</div> <br>
+    
+            <label  class="lhw" for="cPhi3">Cos Phi 3</label>
+            <output class="ohw"  id="cPhi3">0</output>
+            <div    class="uItem">-</div> <br>
+  
+            <label for="p3Cal"    class=" lhw">P3 Cal</label>
+            <input type="number"  class=" ihw" id="p3Cal">
+            <div   class="uItem">-</div> <br>
+    
+            <label for="p3Offset" class=" lhw">P3 Offset</label>
+            <input type="number"  class=" ihw" id="p3Offset">
+            <div   class="uItem">W</div> <br>
+          </div>
+
+          <div class="hide4">
+            <hr>
+            <label  class="lhw" for="p4Real">P4 Real</label>
+            <output class="ohw"  id="p4Real" style="border-color: rgb(211, 2, 2);" >0</output>
+            <div    class="uItem">W</div> <br>
+    
+            <label  class="lhw" for="p4App">P4 Apparent</label>
+            <output class="ohw"  id="p4App">0</output>
+            <div   class="uItem">VA</div> <br>
+    
+            <label  class="lhw" for="cPhi4">Cos Phi 4</label>
+            <output class="ohw"  id="cPhi4">0</output>
+            <div    class="uItem">-</div> <br>
+  
+            <label for="p4Cal"    class=" lhw">P4 Cal</label>
+            <input type="number"  class=" ihw" id="p4Cal">
+            <div   class="uItem">-</div> <br>
+    
+            <label for="p4Offset" class=" lhw">P4 Offset</label>
+            <input type="number"  class=" ihw" id="p4Offset">
+            <div   class="uItem">W</div> <br>
+          </div>
+
+          <hr>
+          <button id="sendPower" type="button" class="sendCfgButton">Send</button>
+      </div>
+
+      <div class="group">
+        <h1>Energy names</h1>
+        <label for="eName0"   class=" lhw">Energy 1 (CT1 Imp)</label>
+        <input type="text"    class=" ihw" id="eName0">
+        <div   class="uItem"> </div> <br>
+
+        <label for="eName1"   class=" lhw">Energy 2 (CT1 Exp)</label>
+        <input type="text"    class=" ihw" id="eName1">
+        <div   class="uItem"> </div> <br>
+
+        <label for="eName2"   class=" lhw">Energy 3 (Div1 est)</label>
+        <input type="text"    class=" ihw" id="eName2">
+        <div   class="uItem"> </div> <br>
+
+        <label for="eName3"   class=" lhw">Energy 4 (Div2 est)</label>
+        <input type="text"    class=" ihw" id="eName3">
+        <div   class="uItem"> </div> <br>
+
+        <label for="eName4"   class=" lhw">Energy 5 (CT2)</label>
+        <input type="text"    class=" ihw" id="eName4">
+        <div   class="uItem"> </div> <br>
+
+        <label for="eName5"   class=" lhw">Energy 6 (CT3)</label>
+        <input type="text"    class=" ihw" id="eName5">
+        <div   class="uItem"> </div> <br>
+
+        <label for="eName6"   class=" lhw">Energy 7 (CT4)</label>
+        <input type="text"    class=" ihw" id="eName6">
+        <div   class="uItem"> </div> <br>
+
+        <label for="eName7"   class=" lhw">Energy 8 (CNT1)</label>
+        <input type="text"    class=" ihw" id="eName7">
+        <div   class="uItem"> </div> <br>
+
+        <label for="eName8"   class=" lhw">Energy 9 (CNT2)</label>
+        <input type="text"    class=" ihw" id="eName8">
+        <div   class="uItem"> </div> <br>
+
+        <hr>
+        <button id="sendEnergyNames" type="button" class="sendCfgButton">Send</button>
+      </div>
+
+      <div class="group">
+        <h1>Diverter Calibration</h1>
+        <label for="pMax1"    class=" lhw">P Max 1</label>
+        <input type="number"  class=" ihw" id="pMax1">
+        <div   class="uItem">W</div> <br>
+
+        <label for="pVolt1"   class=" lhw">P Voltage</label>
+        <input type="number"  class=" ihw" id="pVolt1">
+        <div   class="uItem">V</div> <br>
+
+        <label for="pMargin1" class=" lhw">P Margin</label>
+        <input type="number"  class=" ihw" id="pMargin1">
+        <div   class="uItem">W</div> <br>
+
+        <hr>
+        <label for="pMax2"    class=" lhw">P Max 2</label>
+        <input type="number"  class=" ihw" id="pMax2">
+        <div   class="uItem">W</div> <br>
+
+        <label for="pVolt2"   class=" lhw">P Voltage</label>
+        <input type="number"  class=" ihw" id="pVolt2">
+        <div   class="uItem">V</div> <br>
+
+        <label for="pMargin2" class=" lhw">P Margin</label>
+        <input type="number"  class=" ihw" id="pMargin2">
+        <div   class="uItem">W</div> <br>
+          
+        <hr>
+        <button id="sendDiverter" type="button" class="sendCfgButton">Send</button>
+    <!-- </div> -->
+        <p style="margin:7px;"></p>   <!-- linked groups -->
+    <!-- <div class="group"> -->
+        <h1>PI Controller Coefficients</h1>
+        <label for="cksP" class=" lhw">Synchro P</label>
+        <input type="number"  class=" ihw" id="cksP">
+        <div   class="uItem">-</div> <br>
+
+        <label for="cksI" class=" lhw">Synchro I</label>
+        <input type="number"  class=" ihw" id="cksI">
+        <div   class="uItem">-</div> <br>
+
+        <hr>
+        <label for="ckdP" class=" lhw">Diverter P</label>
+        <input type="number"  class=" ihw" id="ckdP">
+        <div   class="uItem">-</div> <br>
+
+        <label for="ckdI" class=" lhw">Diverter I</label>
+        <input type="number"  class=" ihw" id="ckdI">
+        <div   class="uItem">-</div> <br>
+
+        <hr>
+        <button id="sendCoef" type="button" class="sendCfgButton">Send</button>
+    </div>
+
+    <div class="group">
+          <h1>Pulse Counter Configuration</h1>
+          <label for="counter1" class=" lhw">Counter 1</label>
+          <input type="number"  class=" ihw" id="counter1">
+          <div   class="uItem">p/kWh</div> <br>
+
+          <label for="counter2" class=" lhw">Counter 2</label>
+          <input type="number"  class=" ihw" id="counter2">
+          <div   class="uItem">p/kWh</div> <br>
+  
+          <hr>
+          <button id="sendCounter" type="button" class="sendCfgButton">Send</button>
+      </div>
+
+      <div class="group">
+        <h1>LAN Configuration</h1>
+        <label for="clip"   class=" lhw">IP Address</label>
+        <input type="text"  class=" ihw" id="clip">
+        <div   class="uItem">-</div> <br>
+
+        <label for="clmask" class=" lhw">Mask</label>
+        <input type="text"  class=" ihw" id="clmask">
+        <div   class="uItem">-</div> <br>
+
+        <label for="clgw" class=" lhw">Gateway</label>
+        <input type="text"  class=" ihw" id="clgw">
+        <div   class="uItem">-</div> <br>
+
+        <label for="cldns" class=" lhw">DNS</label>
+        <input type="text"  class=" ihw" id="cldns">
+        <div   class="uItem">-</div> <br>
+
+        <hr>
+        <button id="sendLan" type="button" class="sendCfgButton">Send</button>
+    </div>
+
+    <div class="group">
+        <h1>Favorite Display Page</h1>
+        <label for="cfp" class=" lhw">Page number (0..n)</label>
+        <input type="number"  class=" ihw" id="cfp">
+        <div   class="uItem">-</div> <br>
+
+        <hr>
+        <button id="sendFp" type="button" class="sendCfgButton">Send</button>
+    </div>
+
+  </section>
+
+    <footer>
+      <p id="footerText">AASun by AdAstra-Soft</p>
+    </footer>
+  </main>
+  
+  <script src="js/config.js" type="module"></script>
+</body>
+</html>

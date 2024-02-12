@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AASun Status</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="css/index.css">
+</head>
+
+<body>
+  <main>
+    <nav class="navbar">
+        <div class="navbar-fixed">
+            <img src="images/a.png" alt="AdAstra" class="logo">
+            <button type="button" id="backButton"><<</button>
+            <!-- <button type="button" id="stsButton">Test</button> -->
+
+            <!-- Container to put some button on the right -->
+            <div  style="width:100%;">
+                <div style="display: flex ; float:right; padding-right:5px">
+                    <div class="redLed" id="writeLed" style="width:32px; border-radius: 50%;"></div>
+                    <button type="button" id="writeButton">Write</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <!-- To push next section under the nav bar -->
+    <div class="navbar-spacer"></div>
+
+        <!-- Modal dialog to display update result -->
+        <dialog id="ackDialog" style="border-radius: 6px; background-color: var(--bgColor); border-Color: var(--fgColor);">
+          <form method="dialog">
+          <p id="ackTitle"   style="text-align:center;"> Title </p>
+          <p id="ackMessage" style="text-align:center;"> Dialog Message </p>
+          <div>
+              <button type="submit" style='display:block; margin:0px auto;'>Close</button>
+          </div>
+          </form>
+        </dialog>
+
+  <section class="frame">
+
+      <div class="group">
+        <h1>Variables</h1>
+        <label  class="lhw" for="v1">V1 Day counter</label>
+        <output class="ohw"  id="v1">0</output>
+        <div    class="uItem"></div> <br>
+
+        <label  class="lhw" for="v2">V2 Anti-legionella</label>
+        <output class="ohw"  id="v2">0</output>
+        <div    class="uItem"></div> <br>
+
+        <label  class="lhw" for="v3">V3</label>
+        <output class="ohw"  id="v3">0</output>
+        <div    class="uItem"></div> <br>
+
+        <label  class="lhw" for="v4">V4</label>
+        <output class="ohw"  id="v4">0</output>
+        <div    class="uItem"></div> <br>
+        <hr>
+        <label for="varSelect" style="margin-left:3px;">Choose:</label>
+        <select name="varSelect" id="varSelect" style="height: 2em ;">
+          <option value="V1">V1</option>
+          <option value="V2">V2</option>
+          <option value="V3">V3</option>
+          <option value="V4">V4</option>
+        </select>
+        <label for="varValue" style="margin-left:3px;">Value:</label>
+        <input type="number"  class="toto" id="varValue"
+                style="margin-right:2px; max-width:85px; height:1.2em; text-align:right;font-size:1em;">
+        <button id="varSendButton"  type="button" class="sendButton ">Send</button>
+      </div>
+
+      <div class="group groupForceWidth">
+        <br>
+        <h1>Anti-legionella</h1>
+        <br>
+        <label for="alSelect" style="margin-left:3px;">Choose:</label>
+        <select name="alSelect" id="alSelect" style="height: 2em ;">
+          <option value="0"></option>
+          <option value="Off">Off</option>
+          <option value="T1">T1</option>
+          <option value="T2">T2</option>
+          <option value="T3">T3</option>
+          <option value="T4">T4</option>
+          <option value="I1">I1</option>
+          <option value="I2">I2</option>
+          <option value="I3">I3</option>
+          <option value="I4">I4</option>
+        </select>
+        <label for="alValue" style="margin-left:3px;">Value:</label>
+        <input type="number"  class="toto" id="alValue"
+                style="margin-right:0px; max-width:85px; height:1.2em; text-align:right;font-size:1em;">
+        <button id="alSendButton"  type="button" class="sendButton ">Send</button>
+      </div>
+
+  </section>
+
+    <footer>
+      <p id="footerText">AASun by AdAstra-Soft</p>
+    </footer>
+  </main>
+
+  <script src="js/variable.js" type="module"></script>
+</body>
+</html>

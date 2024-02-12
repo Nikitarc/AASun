@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AASun Status</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="css/index.css">
+</head>
+
+<body>
+  <main>
+    <nav class="navbar">
+        <div class="navbar-fixed">
+          <!-- <a class="navbar-item"> -->
+            <img src="images/a.png" alt="AdAstra" class="logo">
+            <button type="button" id="backButton"><<</button>
+            <!-- <button type="button" id="stsButton">(toggle)</button> -->
+          <!-- </a> -->
+        </div>
+    </nav>
+    <!-- To push next section under the nav bar -->
+    <div class="navbar-spacer"></div>
+
+        <!-- Modal dialog to display update result -->
+        <dialog id="ackDialog" style="border-radius: 6px; background-color: var(--bgColor); border-Color: var(--fgColor);">
+          <form method="dialog">
+          <p id="ackTitle"   style="text-align:center;"> Title </p>
+          <p id="ackMessage" style="text-align:center;"> Dialog Message </p>
+          <div>
+              <button type="submit" style='display:block; margin:0px auto;'>Close</button>
+          </div>
+          </form>
+        </dialog>
+
+  <section class="frame">
+
+      <div class="group">
+        <h1>Power</h1>
+        <label  class="lhw" for="vRms">Voltage RMS</label>
+        <output class="ohw"  id="vRms">0</output>
+        <div    class="uItem">V</div> <br>
+        <hr>
+
+        <label  class="lhw" for="p1Real">P1 Real</label>
+        <output class="ohw"  id="p1Real" style="border-color: rgb(211, 2, 2);" >0</output>
+        <div    class="uItem">W</div> <br>
+
+        <label  class="lhw" for="p1App">P1 Apparent</label>
+        <output class="ohw"  id="p1App">0</output>
+        <div    class="uItem">VA</div> <br>
+
+        <label  class="lhw" for="cPhi1">Cos Phi 1</label>
+        <output class="ohw"  id="cPhi1">0</output>
+        <div    class="uItem">-</div> <br>
+        <hr>
+
+        <label  class="lhw" for="p2Real">P2 Real</label>
+        <output class="ohw"  id="p2Real" style="border-color: rgb(211, 2, 2);" >0</output>
+        <div    class="uItem">W</div> <br>
+
+        <label  class="lhw" for="p2App">P2 Apparent</label>
+        <output class="ohw"  id="p2App">0</output>
+        <div    class="uItem">VA</div> <br>
+
+        <label  class="lhw" for="cPhi2">Cos Phi 2</label>
+        <output class="ohw"  id="cPhi2">0</output>
+        <div    class="uItem">-</div> <br>
+        <hr>
+
+        <div    class="hide3">
+          <label  class="lhw" for="p3Real">P3 Real</label>
+          <output class="ohw"  id="p3Real" style="border-color: rgb(211, 2, 2);" >0</output>
+          <div    class="uItem">W</div> <br>
+
+          <label  class="lhw" for="p3App">P3 Apparent</label>
+          <output class="ohw"  id="p3App"id="p3App">0</output>
+          <div    class="uItem">VA</div> <br>
+
+          <label  class="lhw" for="cPhi3">Cos Phi 3</label>
+          <output class="ohw"  id="cPhi3">0</output>
+          <div    class="uItem">-</div> <br>
+          <hr>
+        </div>
+
+        <div    class="hide4">
+          <label  class="lhw" for="p4Real">P4 Real</label>
+          <output class="ohw"  id="p4Real" style="border-color: rgb(211, 2, 2);" >0</output>
+          <div    class="uItem">W</div> <br>
+
+          <label  class="lhw" for="p4App">P4 Apparent</label>
+          <output class="ohw"  id="p4App">0</output>
+          <div    class="uItem">VA</div> <br>
+
+          <label  class="lhw" for="cPhi4">Cos Phi 4</label>
+          <output class="ohw"  id="cPhi4">0</output>
+          <div    class="uItem">-</div> <br>
+          <hr>
+        </div>
+
+        <label  class="lhw" for="pDiv">P Div (est)</label>
+        <output class="ohw"  id="pDiv">0</output>
+        <div    class="uItem">W</div> <br>
+        <hr>
+
+        <label  class="lhw" for="Counter1">Counter 1</label>
+        <output class="ohw"  id="Counter1">0</output>
+        <div    class="uItem">W</div> <br>
+
+        <label  class="lhw" for="Counter2">Counter 2</label>
+        <output class="ohw"  id="Counter2">0</output>
+        <div    class="uItem">W</div> <br>
+      </div>
+
+      <div class="group">
+        <h1>Energy today</h1>
+        <label  class="lhw" for="eddate" id="eddatename" >Date</label>
+        <p class="ohw dhw"   id="eddate"></p>
+        <div    class="uItem">-</div> <br>
+
+        <label  class="lhw" for="ed0" id="ed0name" >Exported</label>
+        <output class="ohw"  id="ed0">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="ed1" id="ed1name" >Imported</label>
+        <output class="ohw"  id="ed1">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw"  for="ed2" id="ed2name" >Div 1 (est)</label>
+        <output class="ohw"  id="ed2">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="ed3" id="ed3name" >Div 2 (est)</label>
+        <output class="ohw"  id="ed3">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="ed4" id="ed4name" >E2</label>
+        <output class="ohw"  id="ed4">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <div    class="hide3">
+          <label  class="lhw" for="ed5" id="ed5name" >E3</label>
+          <output class="ohw"  id="ed5">0</output>
+          <div    class="uItem">Wh</div> <br>
+        </div>
+
+        <div    class="hide4">
+          <label  class="lhw" for="ed6" id="ed6name" >E4</label>
+          <output class="ohw"  id="ed6">0</output>
+          <div    class="uItem">Wh</div> <br>
+        </div>
+
+        <label  class="lhw" for="ed7" id="ed7name" >Counter 1</label>
+        <output class="ohw"  id="ed7">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="ed8" id="ed8name" >Counter 2</label>
+        <output class="ohw"  id="ed8">0</output>
+        <div    class="uItem">Wh</div>
+      </div>
+
+      <div class="group">
+        <h1>Energy History</h1>
+        <label  class="lhw" for="eydate" id="eydatename" >Date</label>
+        <p class="ohw dhw"   id="eydate"></p>
+        <div    class="uItem">-</div> <br>
+
+        <label  class="lhw" for="ey0" id="ey0name" >Exported</label>
+        <output class="ohw"  id="ey0">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="ey1" id="ey1name" >Imported</label>
+        <output class="ohw"  id="ey1">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="ey2" id="ey2name" >Div 1 (est)</label>
+        <output class="ohw"  id="ey2">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="ey3" id="ey3name" >Div 2 (est)</label>
+        <output class="ohw"  id="ey3">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="ey4" id="ey4name" >E2</label>
+        <output class="ohw"  id="ey4">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <div    class="hide3">
+          <label  class="lhw" for="ey5" id="ey5name" >E3</label>
+          <output class="ohw"  id="ey5">0</output>
+          <div    class="uItem">Wh</div> <br>
+        </div>
+
+        <div    class="hide4">
+          <label  class="lhw" for="ey6" id="ey6name" >E4</label>
+          <output class="ohw"  id="ey6">0</output>
+          <div    class="uItem">Wh</div> <br>
+        </div>
+
+        <label  class="lhw" for="ey7" id="ey7name" >Counter 1</label>
+        <output class="ohw"  id="ey7">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="ey8" id="ey8name" >Counter 2</label>
+        <output class="ohw"  id="ey8">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <hr>
+        <label for="histoDay" class="lhw">History 0=yesterday</label>
+        <input type="number"  class="ihw smallinput" id="histoDay">
+        <button id="lessHistoButton" type="button" class="sendButton smallbutton">-</button>
+        <button id="moreHistoButton" type="button" class="sendButton smallbutton">+</button>
+        <button id="getHistoButton"  type="button" class="sendButton getbutton">Get</button>
+      </div>
+
+      <div class="group">
+        <h1>Energy total</h1>
+        <label  class="lhw" for="eydate" id="etdatename" >Date</label>
+        <p class="ohw dhw"   id="etdate"></p>
+        <div    class="uItem">-</div> <br>
+
+        <label  class="lhw" for="et0" id="et0name" >Exported</label>
+        <output class="ohw"  id="et0">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="et1" id="et1name" >Imported</label>
+        <output class="ohw"  id="et1">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="et2" id="et2name" >Div 1 (est)</label>
+        <output class="ohw"  id="et2">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="et3" id="et3name" >Div 2 (est)</label>
+        <output class="ohw"  id="et3">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="et4" id="et4name" >E2</label>
+        <output class="ohw"  id="et4">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <div    class="hide3">
+          <label  class="lhw" for="et5" id="et5name" >E3</label>
+          <output class="ohw"  id="et5">0</output>
+          <div    class="uItem">Wh</div> <br>
+        </div>
+
+        <div    class="hide4">
+          <label  class="lhw" for="et6" id="et6name" >E4</label>
+          <output class="ohw"  id="et6">0</output>
+          <div    class="uItem">Wh</div> <br>
+        </div>
+
+        <label  class="lhw" for="et7" id="et7name" >Counter 1</label>
+        <output class="ohw"  id="et7">0</output>
+        <div    class="uItem">Wh</div> <br>
+
+        <label  class="lhw" for="et8" id="et8name" >Counter 2</label>
+        <output class="ohw"  id="et8">0</output>
+        <div    class="uItem">Wh</div>
+
+        <hr>
+        <button id="resetTotalButton" type="button" class="sendCfgButton">Reset</button>
+    </div>
+
+     </section>
+
+    <footer>
+      <p id="footerText">AASun by AdAstra-Soft</p>
+    </footer>
+  </main>
+
+  <script src="js/metering.js" type="module"></script>
+</body>
+</html>

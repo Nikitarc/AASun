@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AASun Status</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="css/index.css">
+</head>
+
+<body>
+    <main>
+        <nav class="navbar">
+            <div class="navbar-fixed">
+                <img src="images/a.png" alt="AdAstra" class="logo">
+                <!-- <button type="button" id="stsButton">(GetSts)</button> -->
+                <div style="margin:0; text-align: center; flex-grow: 1; vertical-align: center;">
+                    <p style="margin:0;">AASun - Solar Diverter</p>
+                </div>
+            </div>
+        </nav>
+        <!-- To push next section under the nav bar -->
+        <div class="navbar-spacer"></div>
+
+        <!-- Modal dialog to display update result -->
+        <dialog id="ackDialog" style="border-radius: 6px; background-color: var(--bgColor); border-Color: var(--fgColor);">
+            <form method="dialog">
+            <p id="ackTitle"   style="text-align:center;"> Title </p>
+            <p id="ackMessage" style="text-align:center;"> Dialog Message </p>
+            <div>
+                <button type="submit" style='display:block; margin:0px auto;'>Close</button>
+            </div>
+            </form>
+        </dialog>
+  
+        <section class="frame">
+
+        <div class="group groupForceWidth">
+            <h1 >Windows</h1>
+            <div>
+                <button type="button" class="menuButton" id="divButton">Metering</button>
+                <button type="button" class="menuButton" id="graphButton">Power Graph</button>
+                <button type="button" class="menuButton" id="cfgButton">Configuration</button>
+                <button type="button" class="menuButton" id="forceButton">Diverting & Forcing</button>
+                <button type="button" class="menuButton" id="variableButton">Variables</button>
+            </div>
+        </div>
+
+        <div class="group">
+            <h1>Meter</h1>
+            <label  class="lhw" >Volt</label>
+            <output class="ohw" id="meterVolt">0</output>
+            <div    class="uItem">V</div> <br>
+
+            <label  class="lhw" >Energy total</label>
+            <output class="ohw" id="meterEnergy">0</output>
+            <div    class="uItem">Wh</div> <br>
+
+            <label  class="lhw" >P Apparent</label>
+            <output class="ohw" id="meterPapp">0</output>
+            <div    class="uItem">VA</div><br>
+        </div>
+
+        <div class="group">
+            <h1>Temperature</h1>
+            <label  class="lhw" >Temperature 1</label>
+            <output class="ohw" id="Temperature1">-</output>
+            <div    class="uItem">°C</div> <br>
+
+            <label  class="lhw" >Temperature 2</label>
+            <output class="ohw" id="Temperature2">-</output>
+            <div    class="uItem">°C</div> <br>
+
+            <label  class="lhw" >Temperature 3</label>
+            <output class="ohw" id="Temperature3">-</output>
+            <div    class="uItem">°C</div> <br>
+
+            <label  class="lhw" >Temperature 4</label>
+            <output class="ohw" id="Temperature4">-</output>
+            <div    class="uItem">°C</div> <br>
+        </div>
+
+        <div class="group groupForceWidth">
+            <h1>Status Words</h1>
+            <p style="font-weight: bold; margin: 6px 0 0 6px;">Word A</p>
+
+            <output class="swBit" id="SW_A0"></output>
+            <p      class="swBit">Mode Normal</p>
+            <br>
+            <output class="swBit" id="SW_A1"></output>
+            <p      class="swBit">Mode Stopped</p>
+            <br>
+            <output class="swBit" id="SW_A2"></output>
+            <p      class="swBit">Diverter Enabled</p>
+            <br>
+            <output class="swBit" id="SW_A3"></output>
+            <p      class="swBit">Diverting</p>
+            <br>
+            <output class="swBit" id="SW_A4"></output>
+            <p      class="swBit">Linky On</p>
+            <br>
+            <output class="swBit" id="SW_A5"></output>
+            <p      class="swBit">Time Ok</p>
+            <br>
+            <output class="swBit" id="SW_A6"></output>
+            <p      class="swBit">Power History On</p>
+            <br>
+            <output class="swBit" id="SW_A7"></output>
+            <p      class="swBit">W5500 present</p>
+
+            <hr>
+            <p style="font-weight: bold; margin: 6px 0 0 6px;">Word B</p>
+
+            <output class="swBit" id="SW_B0"></output>
+            <p      class="swBit">Not synchronized</p>
+            <br>
+            <output class="swBit" id="SW_B1"></output>
+            <p      class="swBit">No Configuration in FLASH</p>
+            <br>
+            <output class="swBit" id="SW_B2"></output>
+            <p      class="swBit">ADC Overflow</p>
+            <br>
+            <output class="swBit" id="SW_B3"></output>
+            <p      class="swBit">Diverter Max</p>
+            <br>
+            <output class="swBit" id="SW_B4"></output>
+            <p      class="swBit">Diverter Open</p>
+            <br>
+            <output class="swBit" id="SW_B5"></output>
+            <p      class="swBit">Net Link Off</p>
+            <br>
+            <output class="swBit" id="SW_B6"></output>
+            <p      class="swBit">-</p>
+            <br>
+            <output class="swBit" id="SW_B7"></output>
+            <p      class="swBit">-</p>
+            <br>
+        </div>
+
+        <div class="group">
+            <h1>Versions</h1>
+            <label  class="lhw" >Software</label>
+            <output class="ohw" id="softVersion">0</output>
+            <div    class="uItem"></div> <br>
+
+            <label  class="lhw" >HTTP Server</label>
+            <output class="ohw" id="httpVersion">0</output>
+            <div    class="uItem"></div> <br>
+        </div>
+
+    </section>
+
+        <footer>
+            <p id="footerText">AASun by AdAstra-Soft</p>
+        </footer>
+    </main>
+     
+    <script src="js/index.js" type="module"></script>
+</body>
+</html>

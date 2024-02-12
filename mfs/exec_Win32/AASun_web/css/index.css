@@ -1,0 +1,308 @@
+/* For roboto font: https://fonts.google.com/specimen/Roboto */
+/* https://fonts.googleapis.com/css2?family=Roboto&display=swap */
+@font-face {
+    font-family: 'Roboto';
+    font-style: normal;
+    -weight: 400font;
+    font-display: swap;
+    src: url(https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxK.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Defines global variables */
+:root {
+    font-family: 'Roboto', sans-serif;
+    font-size: 1em ;
+    --bgColor:    rgb(255, 255, 253);
+    --fgColor:    rgb(  0,  83,  28) ;  /* Foreground dark */
+    --fglColor:   rgb( 53, 151,  86) ;  /* Foreground light */
+    --bgNavColor: rgb(  0, 100,  34) ;
+    --btdColor:   #015099 ;       /* Button dark */
+    --btlColor:   #6aaee6;        /* Button light */
+    --btdaColor:  #6aaee6 ;       /* Button dark */
+    --btlaColor:  #6aaee6;        /* Button light */
+    --labelSize:  150px;
+    --itemSize:   110px;
+    --unitSize:   40px ;
+    --groupWidth: calc(var(--labelSize) + var(--itemSize) + var(--unitSize) + 28px) ;
+}
+
+/* textarea, input, button, select, doesn't inherit font */
+/* body, textarea {
+    font-family: 'Roboto', sans-serif;
+    font-size: 1em ;
+} */
+
+/* textarea {
+    font-family: inherit;
+    font-size: inherit;
+ } */
+
+body{
+    background-color: var(--bgColor) ;
+    margin: 0 ;
+    padding: 0;
+}
+
+hr {        /* Horizontal separator */
+    background-color: var(--fgColor);
+    margin: 4px 0 0 0px;       /* top right bottom left */
+    border-width: 0px;
+    height: 1px ;
+}
+
+h1 {
+    color: var(--bgColor);
+    margin: 4px 0 0 0px;    /* top right bottom left */
+    padding-left: 6px ;
+    font-weight: normal ;   /* light normal medium bold */
+    font-size: 1.1em ;
+    background: linear-gradient(to bottom, var(--fgColor), var(--fglColor)) ;
+}
+
+/* The footer : at bottom */
+main {
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;  /* new small viewport height for modern browsers */
+}
+
+footer {
+    margin-top:auto;    /* This pushes the footer to the bottom */
+}
+
+footer p {
+    background: linear-gradient(to bottom, var(--fgColor), var(--fglColor)) ;
+    color: var(--bgColor);
+    text-align: center;
+    font-size: 0.7em ;
+    font-weight: light ; /* light normal medium bold */
+    padding: 0.5em ;
+    margin: 0;
+}
+
+/*-----------------------------------------------*/
+/* Nav bar fixed at top of the viewport */
+.navbar {
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    z-index: 1;     /* To be in front of the spacer */
+    background: linear-gradient(to bottom, var(--fgColor), var(--fglColor)) ;
+    width: 100%;
+    padding: 5px 5px 5px 5px;     /* top | right | bottom | left */
+    margin-bottom: 0px ;
+}
+
+.navbar-fixed {
+    display: flex ;
+    color: var(--bgColor);
+    align-items: center;    /* Align vertical */
+}
+.navbar-spacer {
+    width: 100%;
+    height: 42px ;
+}
+
+/*-----------------------------------------------*/
+
+button {
+    font-size:   17px ;
+    color: var(--bgColor);
+    padding: 5px ;
+    margin: 0 5px 0 5px ;    /* top right bottom left */
+    border-radius: 4px;
+    border: 1px solid var(--bgColor);
+    background: linear-gradient(to bottom, var(--btdColor), var(--btlColor)) ;
+    white-space: nowrap;   /* No wrap on space */
+}
+button:hover {
+    background: linear-gradient(to top, var(--btdColor), var(--btlColor)) ;
+}
+
+button:active {
+    background: linear-gradient(to top, var(--btdaColor), var(--btlaColor)) ;
+}
+
+.smallbutton {
+    width: 28px ;
+    margin: 0 0px 0 0px ;    /* top right bottom left */
+}
+
+button:disabled, button[disabled] {
+    cursor: not-allowed;
+    /* pointer-events:none; */
+    background-color: #cccccc;  
+    color: #666666;
+}
+
+.menuButton {           /* index.html */
+   /* Centering the buttons */
+   display:block;
+   margin: 16px auto ;  /* 16px top/botton, center left/right */
+   min-width: 160px;    /* All the same width */
+   max-width: 160px;
+}
+
+/* Center "Send" button in config.html */
+.sendCfgButton {
+    display: block ;
+    margin:  2px auto;
+}
+
+/*-----------------------------------------------*/
+
+.frame {
+    display:flex;
+    flex-wrap: wrap;
+    justify-content: center;    /* Align horizontal */
+    text-align:left ;
+}
+
+.groupForceWidth {
+    width: var(--groupWidth); 
+}
+.group {
+    position: relative;
+    vertical-align: top;
+    margin: 0 2px;
+}
+
+.lhw {      /* Data label */
+    display: inline-block;
+    /* display: inline; */
+    min-width: var(--labelSize) ;
+    max-width: var(--labelSize) ;
+    margin-left: 6px;
+
+}
+.ihw {      /* Data input */
+    display: inline-block;
+    min-width: var(--itemSize) ;
+    max-width: var(--itemSize) ;
+    margin-top: 6px;
+    text-align: right ;
+    font-size: 1em ;
+    height: 1em ;
+    /* padding: 0 ; */
+}
+.smallinput {
+    min-width: 40px ;
+    max-width: 40px ;
+    height: 1.4em ;
+}
+.ohw {      /* Data output */
+    display: inline-block;
+    min-width: var(--itemSize) ;
+    max-width: var(--itemSize) ;
+    margin-top: 6px ;
+    text-align: right ;
+    height: 1em ;
+
+    /* Add border so input and output has the same height */
+    /* box-sizing: border-box; */
+    border:1px solid rgb(220, 220, 220) ;
+    border-radius: 3px ;
+    padding: 2px 3px 2px 3px ;  /* Because input use 2px padding, 2px border */
+}
+
+.dhw {      /* Date field */
+    border: 0 ;
+    margin-bottom: 0 ;
+}
+
+.uItem {    /* Unit */
+    display: inline-block;
+    min-width: var(--unitSize) ;
+    max-width: var(--unitSize) ;
+    margin-top: 6px;
+    margin-right: 6px;
+    text-align: right ;
+}
+/*-----------------------------------------------*/
+/*-----------------------------------------------*/
+/* index.html specific */
+
+.swBit {
+    display: inline-block;
+    margin: 2px 0 0 6px ;
+    min-width: 20px;
+}
+
+/*-----------------------------------------------*/
+/*-----------------------------------------------*/
+/* Config.html specific */
+
+#divOnOffButton[value="on"] {
+    background: linear-gradient(to bottom, #008000, #00ff00) ;
+}
+#divOnOffButton[value="off"] {
+    background: linear-gradient(to bottom, #800000, #ff0000 ) ;
+}
+#divOnOffButton[value="on"]:hover {
+    background: linear-gradient(to bottom, #00ff00, #008000) ;
+}
+#divOnOffButton[value="off"]:hover {
+    background: linear-gradient(to bottom, #ff0000, #800000) ;
+}
+
+.redLed {
+    /* background:radial-gradient(circle at center, rgb(120, 0, 0) 0, rgb(20, 0, 0) 100%); */
+    box-shadow: none;
+
+}
+
+/*-----------------------------------------------*/
+/* Text Area for forcing.html */
+
+.ruleArea {
+    background:#fafeff ;
+}
+
+.tArea {
+    background: #FfF8F8  /* #e8f4ff ; */
+}
+.rStop {
+    background: #F8FcFF  /* #e8f4ff ; */
+}
+
+
+.tArea, .ruleArea {
+    /* font-family: 'Roboto', sans-serif; */
+    font-size: 15px ;
+    width:     324px ;
+    max-width: 324px ;
+    resize:    vertical ;
+    margin:    5px ;
+}
+
+.tAreaLabel {
+    margin-left:5px;
+}
+
+.forceStatusLabel, .forceStatusValue {
+    min-width: var(--labelSize) ;
+    margin:    5px ;
+}
+
+.greenLed {
+    display:inline-block;
+    margin: 0px 10px 0 10px;       /* top right bottom left */
+    width: 6%;
+    height: 18px;
+    border-radius: 50%;
+}
+
+.greenLed[data-led="on"] {
+    background-color: #ABFF00;
+    box-shadow: rgba(0, 0, 0, 0.2) 0 -1px 7px 1px, inset #304701 0 -1px 5px, #90FF00 0 2px 8px;
+}
+
+.greenLed[data-led="off"] {
+    background-color: #d0e0d0;
+    box-shadow: rgba(0, 0, 0, 0.2) 0 -1px 2px 1px, inset #304701 0 -1px 9px;
+}
+
+.checkDis {
+    margin-left: 10px ;
+}
