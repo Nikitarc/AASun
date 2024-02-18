@@ -3,7 +3,7 @@
 _The project is documented in French because it was designed according to the characteristics of the Linky meter which is specifically French. The router can, however, be used directly on any 50Hz electrical network._
 
 ## Pourquoi un routeur?
-Une installation solaire peut être utilisée en « Auto Consommation », c’est à dire que l’électricité produite est utilisée localement par le producteur plutôt qu’être revendue.
+Une installation solaire peut être utilisée en « Auto Consommation », c’est à dire que l’électricité produite est utilisée localement par le producteur plutôt qu’être vendue.
 Sans équipement spécialisé la consommation est aléatoire :
 - Une partie de la production est utilisée pour le « talon » de consommation du logement : réfrigérateur, VMC, circulateur du chauffage central…
 - A certains moments plusieurs consommateurs peuvent s’activer en même temps et le total de leur consommation dépasser la production photovoltaïque.
