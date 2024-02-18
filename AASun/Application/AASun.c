@@ -40,6 +40,8 @@
 	24/01/29	ac	V1.14	Adjust I/O for expansion PCB
 	24/02/07	ac	V1.15	Attempt to strengthen one wire communication for buggy sensors (timeout)
 							Rework of send_http_response_body()
+	24/02/14	ac	V1.16	Add # operator for Variable comparison in forcing rule
+
 
 ----------------------------------------------------------------------
 */
@@ -60,7 +62,7 @@
 #include	"sh1106.h"		// OLED display
 #include	"w25q.h"		// Flash
 
-#define		AASUN_VERSION		((1u << 16) | 15u)
+#define		AASUN_VERSION		((1u << 16) | 16u)
 
 // For debug: displays tasks stack usage
 static aaTaskInfo_t	taskInfo [AA_TASK_MAX] ;
@@ -175,7 +177,7 @@ static	bool	synchroInit (void)
 			continue ;
 		}
 		voltAdc += (int32_t) adcValues [IX_V1] ;
-		bspToggleOutput (BSP_LED0) ;		// Toggle every 100µs!
+		bspToggleOutput (BSP_LED0) ;		// Toggle every 100ï¿½s!
 	}
 	// Initialize the ADC offset filter with a good approximate value
 	adcOffset = voltAdc / MAIN_SAMPLE_COUNT ;

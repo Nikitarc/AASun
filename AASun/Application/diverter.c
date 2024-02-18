@@ -1047,7 +1047,7 @@ static	bool	forceRuleCompile_ (forceRules_t * pForce, divRule_t * pRule, char * 
 				case 'V':
 					if (number < 1 || number > AASUNVAR_MAX)
 					{
-						* pError = 15 ;		// Invalid In number
+						* pError = 15 ;		// Invalid Var number
 						return false ;
 					}
 					number-- ;		// 1:4  becomes  0:3
@@ -1067,10 +1067,14 @@ static	bool	forceRuleCompile_ (forceRules_t * pForce, divRule_t * pRule, char * 
 				* pError = 16 ;		// Operator not found
 				return false ;
 			}
-			if ((* pStr != '<'  &&  * pStr != '>'  &&  * pStr != '=') ||
-				(* pStr == '='  &&  (pExpr->type == 'T'  ||  pExpr->type == 'P')))
+			// Operator: only < > = # are allowed,
+			// = not allowed for T and P
+			// # only allowed for V
+			if ((* pStr != '<'  &&  * pStr != '>'  &&  * pStr != '='  &&  * pStr != '#') ||
+				(* pStr == '='  &&  (pExpr->type == 'T'  ||  pExpr->type == 'P'))  ||
+				(* pStr == '#'  &&  pExpr->type != 'V'))
 			{
-				* pError = 17 ;		// Only < > = are allowed, < or > is mandatory for T and P
+				* pError = 17 ;
 				return false ;
 			}
 			pExpr->comp = * pStr ;
@@ -1538,6 +1542,13 @@ static	bool	forceRuleCheck_		(forceRules_t * pForce, bool bStart)
 					if (pExpr->comp == '=')
 					{
 						if (var != value)
+						{
+							return false ;
+						}
+					}
+					else if (pExpr->comp == '#')
+					{
+						if (var == value)
 						{
 							return false ;
 						}
