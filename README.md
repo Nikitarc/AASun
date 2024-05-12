@@ -38,7 +38,7 @@ La genèse de ce routeur, sa configuration et son utilisation sont expliquées d
 -	Interface console par UART ou Telnet (réseau filaire ou WIFI).
 
 ![AASun_IO](https://github.com/Nikitarc/AASun/assets/101801098/16495067-dde8-47d1-9afe-b8b53f5aedf1)
-
+Ci dessus le prototype avec toutes les fonctionnalités prévues. La prochaine étape est la réalisation d'un nouveau circuit imprimé plus petit pour l'ensemble des composants.
 
 ## Les dossiers
 `Doc` contient la documentation du routeur
