@@ -17,8 +17,10 @@ La genèse de ce routeur, sa configuration et son utilisation sont expliquées d
 ## Principales caractéristiques :
 -	Prévu pour être placé sur un support pour rail DIN
 -	Microcontrôleur STM32G071CB et flash externe W25Q64
--	Afficheur 1.3’’ et 2 boutons pour naviguer dans les pages
--	Interface réseau filaire, serveur HTTP pour le monitoring, la configuration du routeur et des règles de routage/forçage, l’affichage des historiques.
+-	Afficheur 1.3’’ et 2 boutons pour naviguer dans les pages (l'afficheur de 0.96'' est aussi géré)
+-	Interface réseau filaire
+-	Interface WIFI
+-	Serveur HTTP pour le monitoring, la configuration du routeur et des règles de routage/forçage, l’affichage des historiques.
 -	2 ou 4 capteurs de courant (CT).
 -	2 sorties PWM de routage pour relais statique (SSR).
 -	1 relais 230V 3A sur la carte.
@@ -26,19 +28,20 @@ La genèse de ce routeur, sa configuration et son utilisation sont expliquées d
 -	2 entrées logiques (thermostat, bouton poussoir, heures pleines/creuses, …).
 -	2 entrées de comptage (jusqu’à 30V). Si ces entrées ne sont pas utilisées en comptages elles peuvent être utilisées en entrée logiques.
 -	4 capteurs de température DS18B20.
--	2 règles de routages.
--	8 forçages comportant chacun une règle de démarrage et une règle d’arrêt.
+-	2 règles de routages pour les sorties PWM.
+-	8 forçages comportant chacun une règle de démarrage et une règle d’arrêt pour piloter les 4 sorties du routeur.
 -	Gestion de priorité des routages et des forçages.
 -	Plusieurs modes de forçage : PWM, standard, burst.
--	Historique des énergies journalières sur 31 jours. Historique des puissances moyennées par ¼ heure sur 31 jours. Les 9 valeurs prises en compte sont : CT1 à CT4 (CT1 sépare le soutirage et l’injection),  routage estimé 1 et 2, compteurs d’impulsion 1 et 2.
+-	Historique des énergies journalières sur 31 jours. Historique des puissances moyennées par ¼ heure sur 31 jours. Les 9 valeurs prises en compte sont : CT1 à CT4 (CT1 sépare le soutirage et l’injection),  routage estimé des sorties PWM 1 et 2, compteurs d’impulsion 1 et 2.
 -	Gestion anti légionellose.
 -	Interface Linky.
--	Interface console par UART ou Telnet (réseau).
+-	Interface console par UART ou Telnet (réseau filaire ou WIFI).
 
-![AASun_IO](https://github.com/Nikitarc/AASun/assets/101801098/e2531800-29da-4e6d-8f2b-2426daf71bc7)
+![AASun_IO](https://github.com/Nikitarc/AASun/assets/101801098/16495067-dde8-47d1-9afe-b8b53f5aedf1)
+
 
 ## Les dossiers
-`Doc` contient la documentation
+`Doc` contient la documentation du routeur
 
 `AASUN` est un projet utilisable avec l’environnement de développement STM32CubeIDE pour générer le code du routeur.
 
@@ -46,8 +49,11 @@ La genèse de ce routeur, sa configuration et son utilisation sont expliquées d
 
 `mfs` est un projet Visual Studio 2022 qui permet de générer l’application `mfsbuild` qui permet de créer `AASun_web.bin`. Il permet aussi de générer l’application `SerEl` qui permet de flasher ce système de fichier dans la flash externe du routeur par l’intermédiaire d’un UART.
 
-`AASun_External_Loader` est un projet STM32CubeIDE qui génère un « External Loader » utilisable avec STM32CubeProgrammer. Cela permet  de flasher `AASun_web.bin` dans la flash externe du routeur, en utilisant une sonde ST-LINK.
+`AASun_External_Loader` est un projet STM32CubeIDE qui génère un « External Loader » utilisable avec STM32CubeProgrammer. Cela permet de téléverser `AASun_web.bin` dans la flash externe du routeur, en utilisant une sonde ST-LINK.
 
 `DipTrace` contient les schémas électroniques et les fichiers pour la création des circuits imprimés. Réalisés avec DipTrace : https://diptrace.com/fr/.
 
-Tous les fichiers sont fournis sous une forme directement utilisable : Il suffit d’avoir  STM32CubeProgrammer et un convertisseur USB/UART pour mettre à jour le routeur.
+`http` contient le projet Espressif-IDE pour générer l'application du module WIFI "ESP32-C3 Super Mini"
+
+Tous les fichiers du routeur sont fournis sous une forme directement utilisable : Il suffit d’avoir STM32CubeProgrammer et un convertisseur USB/UART pour mettre à jour le routeur.
+Le logiciel du module WIFI doit être compilé avec Espressif-IDE, qui sert aussi à la téléverser.
