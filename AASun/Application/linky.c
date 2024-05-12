@@ -22,6 +22,8 @@
 	09 MOTDETAT       000000
 
 
+	The Linky is managed from the AASun task, so no need of mutex or critical section
+
 ----------------------------------------------------------------------
 */
 
@@ -40,7 +42,9 @@
 #define	BAUDRATE_HIS	1200		// For historic TIC mode
 #define	BAUDRATE_STD	9600		// For standard TIC mode
 
-#define	TIC_TMO			3000		// Time interval to receive STX/ETX
+#define	TIC_TMO			3000		// Time interval to receive STX/ETX, switch to other mode
+
+#define	TIC_TIME_TMO	3000		// Time interval to receive a time/date group
 
 //------------------------------------------------------------------------------
 //	TIC frame management
@@ -51,7 +55,7 @@
 #define	CC_LF			0x0A
 #define	CC_CR			0x0D
 
-#define	TIC_GROUP_MAX	64		// Max size of a group line
+#define	TIC_GROUP_MAX	128		// Max size of a group line
 
 // The states of the TIC automaton
 typedef enum
@@ -75,6 +79,8 @@ static	char			* ticPtr ;			// Current position in the group buffer
 static	ticCallback_t	ticCallback ;		// The user function to call
 static	uartHandle_t	hUart ;				// The UART handle
 
+static	uint32_t		ticTimeTimeout ;
+
 //------------------------------------------------------------------------------
 //	The array of required TIC informations
 //	This must be configured by the user
@@ -95,6 +101,13 @@ static	const	char * pTicLabel [TIC_VALUES_MAX] =
 } ;
 
 //------------------------------------------------------------------------------
+//	This starts the period to receive a TIC message
+
+void	ticTimeoutStart (void)
+{
+	ticTimeTimeout = aaGetTickCount () ;
+}
+
 //------------------------------------------------------------------------------
 //	A valid group is present in ticBuffer
 
@@ -103,6 +116,8 @@ static	void ticDecode (void)
 	uint32_t	ii ;
 	char		* pLabel  ;
 	char		* pSavePtr ;
+
+	ticTimeoutStart () ;	// Restart time out
 
 	// If required dump the group
 	if (ticDisplay)
@@ -141,6 +156,17 @@ static	void ticDecode (void)
 void	ticNext (void)
 {
 	uint32_t	cc ;
+
+	// Check TIC timeout
+	if ((aaGetTickCount () - ticTimeTimeout) >= TIC_TIME_TMO)
+	{
+		if (ticCallback != NULL)
+		{
+			(* ticCallback) (0, NULL, NULL) ;	// Signal the timeout
+		}
+		statusWClear (STSW_LINKY_ON) ;
+		ticTimeoutStart () ;
+	}
 
 	// The UART baud rate is low so the loop count will be low
 	// So we can use while()
@@ -225,6 +251,7 @@ void	ticNext (void)
 				if (cc == CC_ETX)
 				{
 					// End of frame
+					statusWSet (STSW_LINKY_ON) ;	// Valid frame received, so Linky ON
 					ticState = ticIdle ;
 				}
 				break ;
@@ -321,6 +348,8 @@ void	ticInit (void)
 	meterPapp = 0 ;		// Valid values not yet received
 	meterBase = 0 ;
 	meterVolt = 0 ;
+
+	ticTimeoutStart () ;
 }
 
 //------------------------------------------------------------------------------

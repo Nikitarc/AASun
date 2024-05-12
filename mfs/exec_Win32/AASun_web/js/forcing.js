@@ -459,11 +459,11 @@ function updatePeriodic ()
         let word = data["SW"] ;
 console.log ("statusWord ", word) ;
     
-        // Diverter  on/off is bit 0x04
-        setDivOnOff (wordBit [(word >>> 0) & 0x04] != 0) ;
+        // Diverter  on/off is bit 0x01
+        setDivOnOff (wordBit [(word >>> 0) & 0x01] != 0) ;
 console.log ("statusWord.cgi ended") ;
 
-        // Update dfSuatus and forcing/diverting running green led
+        // Update dfStatus and forcing/diverting running green led
         updateDfStatus () ;
     }) ;
 }

@@ -15,6 +15,7 @@
 	12/06/21	ac	V 1.10	Remove simple mutex in aasema.c
 							No more logMess task. The messages are displayed by the idle task.
 	09/06/22	ac	V 1.11	TLSF: Fail to align to 0x04 or 0x0C in tlsfInit()
+	17/04/24	ac	V 1.12	add aaIoResumeWaitingTask()
 
 ----------------------------------------------------------------------
 */
@@ -727,6 +728,23 @@ aaTcb_t *	aaIoResume (aaDriverDesc_t * pDriverDesc)
 	{
 		aaSchedule_ () ;
 	}
+	return pTcb ;
+}
+
+//--------------------------------------------------------------------------------
+// Check if a task is waiting for this driver resource, then activate the 1st task
+
+aaTcb_t *	aaIoResumeWaitingTask (aaDriverDesc_t * pDriverDesc)
+{
+	aaTcb_t		* pTcb = NULL ;
+
+	aaCriticalEnter () ;
+	if (aaIsIoWaitingTask (pDriverDesc) != 0u)
+	{
+		// A thread is waiting to write
+		pTcb = aaIoResume (pDriverDesc) ;
+	}
+	aaCriticalExit () ;
 	return pTcb ;
 }
 

@@ -125,8 +125,8 @@ typedef enum
 
 
 // First user task configuration
-#define	AA_INIT_STACK_STATIC			0u			// 1: force static stack allocation
-#define	AA_INIT_STACK_SIZE				300u		// Stack word count
+#define	AA_INIT_STACK_STATIC			1u			// 1: force static stack allocation
+#define	AA_INIT_STACK_SIZE				400u		// Stack word count
 #define	AA_INIT_PRIORITY				4u			// Initial task priority. The user can change it later
 #define	AA_INIT_FLAGS					AA_FLAG_STACKCHECK	// Task flags
 #define	AA_INIT_NAME					"tAASun"	// Task name

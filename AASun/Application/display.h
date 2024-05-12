@@ -3,7 +3,7 @@
 
 	Alain Chebrou
 
-	SH1106.h	Simplified library for 128x64 OLED display with SH1106 controller IC
+	display.h	Simplified library for 128x64 OLED display with SH1106 controller IC
 				SPI interface only
 
 	When		Who	What
@@ -12,8 +12,8 @@
 ----------------------------------------------------------------------
 */
 
-#if ! defined SH1106_H_
-#define SH1106_H_
+#if ! defined DISPLAY_H_
+#define DISPLAY_H_
 //--------------------------------------------------------------------------------
 
 // The display dimension
@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-// SH1106 display API
+// Display API
 void 		displayReset		(void) ;
 void 		displayInit			(void) ;
 void		displayOn			(void) ;
@@ -54,7 +54,6 @@ uint32_t	buttonGet			(void) ;
 void		buttonAck			(uint32_t mask) ;
 
 // Digital input/output API
-
 									// To use for inputGet()
 #define		IO_IN1				0	// 	3.3V input of J6
 #define		IO_IN2				1	//  Input of J7 (routed to expansion)
@@ -87,5 +86,5 @@ void		pageUpdate 			(void) ;			// Redraw the current page
 #endif
 
 //--------------------------------------------------------------------------------
-#endif	// SH1106_H_
+#endif	// DISPLAY_H_
 

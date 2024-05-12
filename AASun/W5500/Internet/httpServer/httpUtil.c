@@ -16,7 +16,7 @@
 
 #include "AASun.h"		// To get access to computedData
 #include "jsmn.h"
-#include "SH1106.h"
+#include "display.h"
 
 #include "aautils.h"
 
@@ -25,26 +25,14 @@ static	const char contentTag [] = "Content-Length: " ;
 static	const char endTag [] = "\r\n\r\n" ;
 
 // On 1st call pUri is a pointer to the URI.
-// On next calls pUri must be NULL and ppSaveParam must contain the value returned by the previous call
+// On next calls pUri must be NULL and ppSave must contain the value returned by the previous call
 
 static	bool findParam (char * pUri, char * pName, char * pValue, char ** ppSave)
 {
 	char	* pStr, * pToken, * pSave ;
 
-	if (pUri != NULL)
-	{
-		// 1st call, skip .cgi name
-		pStr = strtok_r (pUri, "?", ppSave) ;
-		if (pStr == NULL)
-		{
-			* pName = 0 ;
-			* pValue = 0 ;
-			return false ;		// No .cgi ?
-		}
-	}
-
 	// Get the next pair
-	pStr = strtok_r (NULL, "&", ppSave) ;
+	pStr = strtok_r (pUri, "&", ppSave) ;
 
 	if (pStr != NULL)
 	{
@@ -66,10 +54,9 @@ static	bool findParam (char * pUri, char * pName, char * pValue, char ** ppSave)
 	return false ;		// No parameter
 }
 
-// On entry  buf is pHTTP_TX which contain the parsed st_http_request, with the URI
-// On output buf will contain the output data
+//------------------------------------------------------------------
 
-uint8_t http_get_cgi_handler(uint8_t * uri_name, uint8_t * buf, uint32_t lenMax, uint32_t * file_len)
+uint8_t http_get_cgi_handler_common (uint8_t * uri_name, char * pUriData, uint8_t * buf, uint32_t lenMax, uint32_t * file_len)
 {
 	uint8_t ret = HTTP_OK;
 	uint16_t len = 0;
@@ -79,7 +66,7 @@ uint8_t http_get_cgi_handler(uint8_t * uri_name, uint8_t * buf, uint32_t lenMax,
 	char	* pSaveParam ;
 
 	// Find 1st parameter which is the message id
-	findParam ((char *)((st_http_request *) buf)->URI, midName, midValue, & pSaveParam) ;
+	findParam (pUriData, midName, midValue, & pSaveParam) ;
 
 	// Find 2nd parameter
 //	findParam (NULL, name2, value2, & pSaveParam) ;
@@ -312,10 +299,13 @@ uint8_t http_get_cgi_handler(uint8_t * uri_name, uint8_t * buf, uint32_t lenMax,
 		len += aaSnPrintf((char*)buf + len, lenMax-len,
 				",\"counter1\":\"%lu\""
 				",\"counter2\":\"%lu\""
-				",\"cfp\":\"%lu\"",
+				",\"cfp\":\"%lu\""
+				",\"display\":\"%s\"",
 				pulseCounter [0].pulsepkWh,
 				pulseCounter [1].pulsepkWh,
-				aaSunCfg.favoritePage) ;
+				aaSunCfg.favoritePage,
+				aaSunCfg.displayController == DISPLAY_NONE ? "None" :
+				aaSunCfg.displayController == DISPLAY_SH1106 ? "SH1106" : "SSD1306") ;
 
 		len += aaSnPrintf((char*)buf + len, lenMax-len,
 				",\"clip\":\"%lu\""
@@ -414,6 +404,7 @@ uint8_t http_get_cgi_handler(uint8_t * uri_name, uint8_t * buf, uint32_t lenMax,
 		}
 		else
 		{
+aaPrintf ("Unknown MID '%s'\n", midValue) ;
 			ret = HTTP_FAILED ;
 			len = 0 ;
 		}
@@ -480,8 +471,12 @@ uint8_t http_get_cgi_handler(uint8_t * uri_name, uint8_t * buf, uint32_t lenMax,
 	else if (strcmp ((const char *) uri_name, "version.cgi") == 0)
 	{
 		len = aaSnPrintf((char*)buf, lenMax,
-				"{\"soft\":\"%ld\"}",
-				AASunVersion ()) ;
+				"{\"soft\":\"%ld\""
+				",\"wifi\":\"%ld\""
+				",\"wifiAP\":\"%ld\"}",
+				AASunVersion (),
+				wifiSoftwareVersion,
+				wifiModeAP) ;
 	}
 
 	else if (strcmp ((const char *) uri_name, "enames.cgi") == 0)
@@ -605,6 +600,30 @@ uint8_t http_get_cgi_handler(uint8_t * uri_name, uint8_t * buf, uint32_t lenMax,
 
 	* file_len = len ;
 	return ret;
+}
+
+//------------------------------------------------------------------
+// To call from W5500 httpServer.c
+// On entry  buf is pHTTP_TX which contain the parsed st_http_request, with the full URI, example: /toto.cgi?a=1
+// On output buf will contain the response body of size file_len
+
+uint8_t http_get_cgi_handler (uint8_t * uri_name, uint8_t * buf, uint32_t lenMax, uint32_t * file_len)
+{
+	char	* pUri = (char *)((st_http_request *) buf)->URI ;
+	char	* pStr ;
+
+	// skip .cgi name
+	pStr = strchr (pUri, '?') ;
+	if (pStr == NULL)
+	{
+		pUri += strlen (pUri) ;		// No parameter
+	}
+	else
+	{
+		pUri = pStr + 1 ; // +1 to skip '?'
+	}
+
+	return http_get_cgi_handler_common (uri_name, pUri, buf, lenMax, file_len) ;
 }
 
 //------------------------------------------------------
@@ -1281,6 +1300,39 @@ static bool	midSetAlFn  (jsmntok_t * pTokens, char * pJson, uint32_t * pError)
 }
 
 //------------------------------------------------------
+
+static bool	midSetDisplayFn  (jsmntok_t * pTokens, char * pJson, uint32_t * pError)
+{
+	char		* pDisplay ;
+
+	(void)  pError ;
+
+	pDisplay = jsmnGetString (pTokens, pJson, "display") ;
+	if (pDisplay == NULL)
+	{
+		return false ;
+	}
+
+	if (strcmp (pDisplay, "SH1106") == 0)
+	{
+		aaSunCfg.displayController = DISPLAY_SH1106 ;
+	}
+	else if (strcmp (pDisplay, "SSD1306") == 0)
+	{
+		aaSunCfg.displayController = DISPLAY_SSD1306 ;
+	}
+	else if (strcmp (pDisplay, "None") == 0)
+	{
+		aaSunCfg.displayController = DISPLAY_NONE ;
+	}
+	else
+	{
+		return false ;
+	}
+	return true ;
+}
+
+//------------------------------------------------------
 // Mandatory same order in enum and midFnArray
 
 // setConfig.cgi message ID
@@ -1305,6 +1357,7 @@ enum
 	midResetEnergyTotal = 16,
 	midSetVar			= 17,
 	midSetAl			= 18,
+	midSetDisplay		= 19,
 	midMax,					// Must be the last item
 } ;
 
@@ -1328,62 +1381,31 @@ static	pMidFn	midFnArray [midMax] =
 	midForcingManualFn,
 	midResetEnergyTotalFn,
 	midSetVarFn,
-	midSetAlFn
+	midSetAlFn,
+	midSetDisplayFn
 };
 
 //------------------------------------------------------
-// Input parameter buf is pHTTP_RX, with size DATA_BUF_SIZE
 
-uint8_t http_post_cgi_handler(uint8_t * uri_name, st_http_request * p_http_request, uint8_t * buf, uint32_t * file_len)
+// Rewrite http_post_cgi_handler to be common to WIFI and W5500
+
+uint8_t http_post_cgi_handler_common (char * uri_name, postCgiParam_t * pParam)
 {
 	uint8_t		ret = HTTP_FAILED;
 	uint16_t	len = 0;
 	int32_t		nt ;
-	uint32_t	dataSize ;
-	char		* pJson ;
-	jsmn_parser	* pParser = (jsmn_parser *) buf ;
-	jsmntok_t	* pTokens = (jsmntok_t *) (buf + sizeof (jsmn_parser)) ;
+	jsmn_parser	* pParser = (jsmn_parser *) pParam->respBuffer ;
+	jsmntok_t	* pTokens = (jsmntok_t *) (pParam->respBuffer + sizeof (jsmn_parser)) ;
 
-	(void) buf ;
-/*
- 	// Template for generic post.cgi request management
-	if(strcmp ((const char *) uri_name, "post.cgi") == 0)
-	{
-		// Get a pointer on the request data
-		pJson = getRequestDataPtr ((char *) p_http_request->URI, & dataSize) ;
-
-		// Build JSON array
-		jsmn_init (pParser) ;
-		nt = jsmn_parse (pParser, pJson, dataSize, pTokens, (DATA_BUF_SIZE - sizeof (jsmn_parser)) / sizeof (jsmntok_t)) ;
-		if (nt < 0)
-		{
-		    aaPrintf ("Failed to parse JSON: %d\n", nt);
-		}
-		else
-		{
-			// For test
-			jsmnDump (pTokens, pJson) ;
-
-		    // HTML request return value
-			strcpy ((char*) buf, "OK") ;
-			len = strlen ((char *) buf) ;
-			ret = HTTP_OK ;
-		}
-	}
-	else
-*/
 	if(strcmp ((const char *) uri_name, "setConfig.cgi") == 0)
 	{
 		char		* pMid ;
 		uint32_t	mid ;
 		uint32_t	error = JSON_ERROR ;	// Default error: JSON tag not found
 
-		// Get a pointer on the request data
-		pJson = getRequestDataPtr ((char *) p_http_request->URI, & dataSize) ;
-
 		// Build JSON array
 		jsmn_init (pParser) ;
-		nt = jsmn_parse (pParser, pJson, dataSize, pTokens, (DATA_BUF_SIZE - sizeof (jsmn_parser)) / sizeof (jsmntok_t)) ;
+		nt = jsmn_parse (pParser, pParam->data, pParam->contentSize, pTokens, (DATA_BUF_SIZE - sizeof (jsmn_parser)) / sizeof (jsmntok_t)) ;
 		if (nt < 0)
 		{
 		    aaPrintf ("Failed to parse JSON: %d\n", nt);
@@ -1394,7 +1416,7 @@ uint8_t http_post_cgi_handler(uint8_t * uri_name, st_http_request * p_http_reque
 //jsmnDump (pTokens, pJson) ;
 
 			// Get the message ID value
-			pMid = jsmnGetString (pTokens, pJson, "mid") ;
+			pMid = jsmnGetString (pTokens, pParam->data, "mid") ;
 			if (pMid != NULL)
 			{
 				char	* pEnd ;
@@ -1403,18 +1425,18 @@ uint8_t http_post_cgi_handler(uint8_t * uri_name, st_http_request * p_http_reque
 				if ((pMid != pEnd)  &&  (* pEnd == 0)  &&  (mid < midMax))
 				{
 					// Call the function for this mid
-					if ((* (midFnArray[mid]))(pTokens, pJson, & error))
+					if ((* (midFnArray[mid]))(pTokens, pParam->data, & error))
 					{
 						// HTML request return value
-						len = aaSnPrintf  ((char*) buf, 100, "OK %u", mid) ;
-						len = strlen ((char *) buf) ;
+						len = aaSnPrintf  (pParam->respBuffer, 100, "OK %u", mid) ;
+						len = strlen (pParam->respBuffer) ;
 						ret = HTTP_OK ;
 					}
 					else
 					{
 						// Fail
-						aaSnPrintf  ((char*) buf, 100, "Error %u %u", mid, error) ;
-						len = strlen ((char *) buf) ;
+						aaSnPrintf  (pParam->respBuffer, 100, "Error %u %u", mid, error) ;
+						len = strlen (pParam->respBuffer) ;
 						ret = HTTP_OK ;
 					}
 				}
@@ -1428,9 +1450,24 @@ uint8_t http_post_cgi_handler(uint8_t * uri_name, st_http_request * p_http_reque
 	}
 
 	if (ret == HTTP_OK)
-		* file_len = len ;
+		* pParam->respLen = len ;
 	return ret ;
 }
+
+// Call from W5500 library
+// Input parameter buf is pHTTP_RX, with size DATA_BUF_SIZE
+uint8_t http_post_cgi_handler (uint8_t * uri_name, st_http_request * p_http_request, uint8_t * buf, uint32_t * file_len)
+{
+	postCgiParam_t	param ;
+
+	param.respBuffer = (char *) buf ;
+	param.respLen    = file_len ;
+	param.data       = getRequestDataPtr ((char *) p_http_request->URI, & param.contentSize) ;
+
+	return http_post_cgi_handler_common ((char *) uri_name, & param) ;
+}
+
+//------------------------------------------------------
 /*
 uint8_t predefined_get_cgi_processor(uint8_t * uri_name, uint8_t * buf, uint16_t * len)
 {

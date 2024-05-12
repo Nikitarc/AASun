@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AASun Credentials</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="css/index.css">
+</head>
+
+<body>
+  <main>
+    <nav class="navbar">
+        <div class="navbar-fixed">
+            <img src="images/a.png" alt="AdAstra" class="logo">
+            <!-- <button type="button" id="backButton"><<</button> -->
+
+            <!-- Container to put some button on the right -->
+            <div  style="width:100%;">
+              <div style="display: flex ; float:right; padding-right:5px">
+                <div class="redLed" id="writeLed" disabled style="height:32px; width:32px; border-radius: 50%;"></div>
+                <!-- <button type="button" id="writeButton">Write</button> -->
+            </div>
+        </div>
+        </div>
+    </nav>
+    <!-- To push next section under the nav bar -->
+    <div class="navbar-spacer"></div>
+
+        <!-- Modal dialog to display update result -->
+        <dialog id="ackDialog" style="border-radius: 6px; background-color: var(--bgColor); border-Color: var(--fgColor);">
+          <form method="dialog">
+          <p id="ackTitle"   style="text-align:center;"> Title </p>
+          <p id="ackMessage" style="text-align:center;"> Dialog Message </p>
+          <div>
+              <button type="submit" style='display:block; margin:0px auto;'>Close</button>
+          </div>
+          </form>
+        </dialog>
+
+    <section class="frame">
+
+      <div class="group groupForceWidth">
+        <p style="margin-left: 3px;"><em property="italic">Spaces are not allowed in SSID or password</em></p>
+        <h1>Station Mode Credentials</h1>
+        <label for="staSsid"  class="lcred" >SSID:</label>
+        <input type="text"  id="staSsid"     class="icred">
+        <br>
+        <label for="staPassword"  class="lcred" >Password:</label>
+        <input type="text"  id="staPassword" class="icred">
+        <br><br>
+        <button id="staSendButton"  type="button" class="sendCfgButton ">Send</button>
+        <br>
+
+        <h1>Acces Point Mode Credentials</h1>
+        <label for="apPassword"  class="lcred" >Password:</label>
+        <input type="text"  id="apPassword" class="icred">
+        <br><br>
+        <button id="apResetButton"  type="button"  ">Reset</button>
+        <div style="display: flex ; float:right; padding-right:5px;">
+          <button id="apSendButton"  type="button"  ">Send</button>
+        </div>
+        <br>
+        <br>
+        <hr>
+      </div>
+    </section>
+
+    <footer>
+       <p id="footerText">AASun by AdAstra-Soft</p>
+    </footer>
+  </main>
+
+  <script src="js/identify.js" type="module"></script>
+</body>
+</html>

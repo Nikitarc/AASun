@@ -21,7 +21,7 @@
 //--------------------------------------------------------------------------------
 
 #define	MFS_FS_VERSION		((1 << 16) | 0)
-#define	MFS_SOFT_VERSION	((1 << 16) | 0)
+#define	MFS_SOFT_VERSION	((1 << 16) | 1)
 #define	MFS_SB_MAGIC	(('5' << 24) | ('F' << 16) | ('A' << 8) | 'A')
 
 #define	MFS_ENTRY_SIZE_MAX		96		// With 512 B block, allows min 5 files per directory block, max name length 88
@@ -65,6 +65,10 @@ typedef struct mfsSuperBloc_s
 	uint32_t		version ;		// File system version
 	uint32_t		blockSize ;		// Logical size of block on disk
 	uint32_t		blockPower2 ;	// (1 << blockPower2) is blockSize
+	uint32_t		fsCRC ;			// CRC of this file system
+	uint32_t		fsSize ;		// Size of this file system
+	uint32_t		reserve1 ;
+	uint32_t		reserve2 ;
 	char			text [0] ;
 
 } mfsSuperBloc_t ;
@@ -110,6 +114,8 @@ typedef struct mfsCtx_s
 	// Internal data
 	uint32_t		blockSize ;		// Logical size of block on disk
 	uint32_t		blockPower2 ;	// (1 << blockPower2) is blockSize
+	uint32_t		fsCRC ;			// CRC of the file system (excluding super bloc)
+	uint32_t		fsSize ;		// Size of this file system
 
 } mfsCtx_t ;
 
@@ -189,6 +195,12 @@ void			mfsRewind		(mfsFile_t * pFile) ;
 
 mfsError_t		mfsDirOpen		(mfsCtx_t * pCtx, const char * path, mfsDir_t * pDir) ;
 mfsError_t		mfsDirRead		(mfsCtx_t * pCtx, mfsDir_t * pDir, mfsDirEntry_t * pEntry) ;
+
+static inline void mfsGetCrc (mfsCtx_t * pCtx, uint32_t * pCRC, uint32_t * pSize)
+{
+	* pCRC  = pCtx->fsCRC ;
+	* pSize = pCtx->fsSize ;
+}
 
 #ifdef __cplusplus
 }

@@ -41,7 +41,12 @@
 	24/02/07	ac	V1.15	Attempt to strengthen one wire communication for buggy sensors (timeout)
 							Rework of send_http_response_body()
 	24/02/14	ac	V1.16	Add # operator for Variable comparison in forcing rule
-
+	24/03/06	ac	V1.17	Add function timeDateToWd(), to compute day of week when the date is set manually
+							Add internal pull up on IN3 and IN4 (avoid floating input when LM393 is not soldered)
+							Errors in shell commands "cpm" and "e Z"
+	24/05/10	ac	V1.18	Adding WIFI, by communicating via UART with an ESP32
+							Update MFS: date and CRC of the file system
+							Create timeUpdate.c
 
 ----------------------------------------------------------------------
 */
@@ -58,11 +63,13 @@
 #define		AASUN_MAIN		// To instantiate all EXTERN here
 #include	"AASun.h"
 
+#include	"wifi.h"
 #include	"temperature.h"
-#include	"sh1106.h"		// OLED display
+#include	"display.h"		// OLED display
+#include	"spi.h"
 #include	"w25q.h"		// Flash
 
-#define		AASUN_VERSION		((1u << 16) | 16u)
+#define		AASUN_VERSION		((1u << 16) | 18u)
 
 // For debug: displays tasks stack usage
 static aaTaskInfo_t	taskInfo [AA_TASK_MAX] ;
@@ -177,7 +184,7 @@ static	bool	synchroInit (void)
 			continue ;
 		}
 		voltAdc += (int32_t) adcValues [IX_V1] ;
-		bspToggleOutput (BSP_LED0) ;		// Toggle every 100ï¿½s!
+		bspToggleOutput (BSP_LED0) ;		// Toggle every 100µs!
 	}
 	// Initialize the ADC offset filter with a good approximate value
 	adcOffset = voltAdc / MAIN_SAMPLE_COUNT ;
@@ -300,7 +307,6 @@ tst1_0 () ;		// Falling of pulse on main  0 crossing
 	}
 aaPuts ("Running\n") ;
 	statusWClear (STSW_NOT_SYNC) ;
-	statusWSet   (STSW_NORMAL) ;
 
 	bspOutput (BSP_LED0, BSP_LED0_OFF) ;		// Blue LED off
 	return true ;
@@ -552,7 +558,6 @@ tst0_0 () ;		// Falling: of sample Processing
 
 void diverterStart (void)
 {
-	statusWClear (STSW_NORMAL) ;
 	statusWSet   (STSW_NOT_SYNC) ;
 
 	// Configure ADC acquisition
@@ -592,9 +597,6 @@ void diverterStart (void)
 
 void diverterStop (void)
 {
-	statusWClear (STSW_NORMAL) ;
- 	statusWSet   (STSW_STOPPED) ;
-
  	adcStop () ;			// Stop the ADC acquisition: no more DMA interrupt
 	meterCmd = 1u ;			// Request to stop the AASun meter task
 	while (meterCmd == 1u)
@@ -606,6 +608,7 @@ void diverterStop (void)
 //--------------------------------------------------------------------------------
 // Called when the Linky send an information we want
 // pSavePtr is intended for use by strtok_r() to retrieve values
+// if pLabel is NULL then this is a get time timeout
 
 void myTicCallback (uint32_t index, const char * pLabel, char * pSavePtr)
 {
@@ -613,49 +616,20 @@ void myTicCallback (uint32_t index, const char * pLabel, char * pSavePtr)
 
 	(void) pLabel ;
 
+	if (pSavePtr == NULL)
+	{
+		// Linky timeout
+		timeUpdateTic (NULL) ;
+		return ;
+	}
+
 	switch (index)
 	{
 		// Values from standard mode (separator 0x09)
 		// -----------------------------------------
 		case  TIC_IDX_DATE:
-			{
-				pStr = strtok_r (NULL, "\t", & pSavePtr) ;
-
-				// Initialize the date/time if it is requested
-				if (bLinkyDateUpdate)
-				{
-					localTime.hh = ((pStr [7]  & 0x0F) * 10) + (pStr [8]  & 0x0F) ;
-					localTime.mm = ((pStr [9]  & 0x0F) * 10) + (pStr [10] & 0x0F) ;
-					localTime.ss = ((pStr [11] & 0x0F) * 10) + (pStr [12] & 0x0F) ;
-
-					if (pStr [0] == 'E')
-					{
-						// On summer time : adjust the hour to UTC+1 by subtracting 1 to the hour
-						localTime.hh -- ;
-						if (localTime.hh == -1)
-						{
-							localTime.hh = 23 ;
-						}
-					}
-// TODO Is this OK ?
-					// Avoid day+1 from 23h to 0h on summer time
-					if (statusWTest (STSW_TIME_OK) == false  ||  localTime.hh != 23)
-					{
-						localTime.yy = ((pStr [1] & 0x0F) * 10) + (pStr [2] & 0x0F) + 2000 ;
-						localTime.mo = ((pStr [3] & 0x0F) * 10) + (pStr [4] & 0x0F) ;
-						localTime.dd = ((pStr [5] & 0x0F) * 10) + (pStr [6] & 0x0F) ;
-					}
-					localTime.wd = sntpSecondToWd (sntpDateToSecond (& localTime)) ;
-					bLinkyDateUpdate = false ;
-					statusWSet (STSW_TIME_OK) ;
-
-					// If required, signal to AASun task to start/synchronize power history
-					if (timeIsUpdated == 1)
-					{
-						timeIsUpdated = 2 ;
-					}
-				}
-			}
+			pStr = strtok_r (NULL, "\t", & pSavePtr) ;
+			timeUpdateTic (pStr) ;
 			break ;
 
 		case  TIC_IDX_EAST:
@@ -698,104 +672,6 @@ void myTicCallback (uint32_t index, const char * pLabel, char * pSavePtr)
 			break ;
 	}
 }
-//--------------------------------------------------------------------------------
-//	SNTP callback
-
-// result: 0 success, -1 timeout
-
-void sntpCb (int32_t result, datetime * time)
-{
-	if (result == 0u)
-	{
-		// Success
-aaPrintf("CurT %02d:%02d:%02d  %04d/%02d/%02d\n", localTime.hh, localTime.mm, localTime.ss, localTime.yy, localTime.mo, localTime.dd) ;	// TODO remove
-aaPrintf("SNTP %02d:%02d:%02d  %04d/%02d/%02d\n", time->hh, time->mm, time->ss, time->yy, time->mo, time->dd) ;	// TODO remove
-
-		bspDisableIrq () ;			// Called from low priority task: need exclusive use
-		localTime.hh = time->hh ;
-		localTime.mm = time->mm ;
-		localTime.ss = time->ss ;
-		localTime.yy = time->yy ;
-		localTime.mo = time->mo ;
-		localTime.dd = time->dd ;
-		localTime.wd = time->wd ;
-		statusWSet (STSW_TIME_OK) ;
-		bspEnableIrq () ;
-
-		// If required, signal to AASun task to start/synchronize power history
-		if (timeIsUpdated == 1)
-		{
-			timeIsUpdated = 2 ;
-		}
-	}
-	else
-	{
-		aaPuts ("SNTP timeout\n") ;
-		timeIsUpdated = 0 ;			// Time update failed, free to retry
-	}
-}
-
-//--------------------------------------------------------------------------------
-//	DNS callback
-//	This callback is used to translate pool.ntp.org domain name to an ip address
-//	then do a SNTP request to set the date/time
-
-// Result:
-//	0	Success, ip is valid
-//	1	DNS primary server fail
-//	2	DNS alternate server fail
-
-void dnsCb (int32_t result, uint8_t * ip)
-{
-	if (result == 0u)
-	{
-		// Success
-		aaPrintf ("DNS Translated to [%d.%d.%d.%d]\n", ip[0], ip[1], ip[2], ip[3]) ;
-		sntpRequest (ip, SNTP_TZ, sntpCb) ; ;
-	}
-	else if (result == 1u)
-	{
-		// DNS primary fail, try alternate DNS
-		aaPrintf ("DNS Pri fail\n") ;
-		dnsRequest (1, NULL, dnsCb) ;
-	}
-	else
-	{
-		// DNS alternate fail
-		aaPrintf ("DNS Alt fail\n") ;
-		timeIsUpdated = 0 ;			// Time update failed, free to retry
-	}
-}
-
-//--------------------------------------------------------------------------------
-// Need to update the time. Source may be SNTP or Linky.
-// If mode is 1: When the time is updated then synchronize the history
-
-void	timeUpdateRequest (uint32_t mode)
-{
-	if (mode == 1u)
-	{
-		// After time update synchronize power history
-		timeIsUpdated = 1 ;		// This will be 2 when the date/time is updated
-	}
-
-	// If the net is on, then send SNTP request to update date/time
-	if (statusWTest (STSW_NET_LINK_OFF) == 0)
-	{
-		// This starts a procedure to get an IP address, then send a SNTP request, then set the date/time
-aaPrintf ("dnsRequest\n") ;
-		dnsRequest (0, "pool.ntp.org", dnsCb) ;
-	}
-	else
-	{
-		// If present the Linky will updated date/time
-		if (ISOPT_LINKY)
-		{
-aaPrintf ("Linky date request\n") ;
-			bLinkyDateUpdate = true ;
-		}
-	}
-}
 
 //--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------
@@ -814,22 +690,6 @@ void	AASun ()
  	int32_t		arg2 ;
  	int32_t		arg3 ;
  	uint32_t	ii ;
-/*
-	// Attempt to allow the application to be started after downloading by CubeProgrammer
- 	aaPrintf ("\nRCC->CSR 0x%08X\n", RCC->CSR) ;
- 	if ((RCC->CSR & RCC_CSR_SFTRSTF) == 0)
- 	{
- 		aaPuts ("\nbspResetHardware\n") ;
- 		aaTaskDelay (50) ;
-		bspResetHardware () ;
- 	}
- 	else
- 	{
- 		RCC->CSR |= RCC_CSR_RMVF ;
- 	}
- 	aaPrintf ("\nRCC->CSR 0x%08X\n", RCC->CSR) ;
-
-*/
 
  	// Upon power on, internal pull-down resistors on UCPD1 CC1 and CC2 pins are enabled:
  	// disable these pull-down resistors
@@ -844,13 +704,17 @@ void	AASun ()
 	aaPuts ("Clock source: ") ;
 	((RCC->CR & RCC_CR_HSERDY) != 0) ? aaPuts ("HSE\n") : aaPuts ("HSI\n") ;
 
- 	displayInit () ;
+	// Read configuration from FLASH. This provides the display controller to use
+	spiInit (flashSpi) ;
+ 	W25Q_Init () ;
+	readCfg () ;
+
+	displayInit () ;
  	pageUpdate () ;		// Displays the page 0 (AA logo)
 
  	memset (aaSunVariable, 0, sizeof (aaSunVariable)) ;
  	buttonInit () ;
  	inOutInit () ;
- 	W25Q_Init () ;
  	timersInit () ;
  	timerStart (TIMER_ENERGY_IX, TIMER_ENERGY_PERIOD) ;
  	timeInit (& localTime) ;
@@ -860,8 +724,7 @@ void	AASun ()
 		tsInit () ;			// Temperature sensors
 	}
 
-	// Read configuration from FLASH
-	readCfg () ;
+	// Initialize energy counters and power history
 	readTotalEnergyCounters () ;		// Read permanent energy counters
 	memset (& energyJ,     0, sizeof (energyJ)) ;
 	memset (& dayEnergyWh, 0, sizeof (dayEnergyWh)) ;
@@ -900,7 +763,6 @@ void	AASun ()
 
 	if (ISOPT_LINKY)
 	{
-		statusWSet (STSW_LINKY_ON) ;
 		ticInit () ;		// Start Linky TIC receive
 		ticSetCallback (myTicCallback) ;
 	}
@@ -908,16 +770,12 @@ void	AASun ()
 	diverterStart () ;		// Create and start the meter task
 
 	// Get date/time
-	// This will triggers time update, and date update in history data
+	// This will triggers time update, and starts the power history
 	timeUpdateRequest (1) ;
-/*
-// Flush console input from Cube programmer
-while (aaCheckGetChar () != 0)
-{
-	(void) aaGetChar () ;
-}
-*/
-	bDiverterSet = true ;		// Enable diverting
+
+	bDiverterSet = true ;	// Enable diverting
+
+
 
 	// Main loop: Wait for user commands, and acquired data
 	while (1)
@@ -931,50 +789,43 @@ while (aaCheckGetChar () != 0)
 			collectionDataOk = 0 ;		// collectionData is free
 
 			// Manage software timer tasks
-			if (0 != timeTick (& localTime))	// To call every second
+			uint32_t timeTickRes = timeTick (& localTime) ; 	// To call every second
+			if (timeTickRes == 0)
 			{
-				// It is midnight
-				// Start the timer to get the time/date from Linky or DNS (daily time synchronization)
-				// Don't do this at midnight to avoid time server overload
-				timerStart (TIMER_DATE_IX, TIMER_DATE_PERIOD) ;
-
+				// It is 00:00:00 o'clock,
 				aaSunVariable [ASV_DAYS]++ ;	// Running days counter
 				aaSunVariable [ASV_ANTIL]++ ;	// Anti-legionella counter
 			}
-			if (timerExpired (TIMER_DATE_IX))
+			if (timeTickRes == ((1 << 16) + (7 << 8)))
 			{
-				// Periodic time/date update after midnight
+				// It is 01:07:00 o'clock, do daily time synchronization if not already requested
 				if (timeIsUpdated == 0u)
 				{
 					timeUpdateRequest (1) ;	// When the date is received, timeIsUpdated will change to 2
 				}
-				timerStop (TIMER_DATE_IX) ;
 			}
+
 			if (timeIsUpdated == 2)
 			{
-				// Time/date newly updated, synchronize power history
+				// Time/date newly updated: start or synchronize power history
 				timeIsUpdated = 0 ;
 				histoStart () ;
 			}
-
-			if (timerExpired (TIMER_ENERGY_IX))
-			{
-				writeTotalEnergyCounters () ;	// Periodic flash backup of total energy counters
-			}
-
 			if (timerExpired (TIMER_HISTO_IX))
 			{
 				// Compute the average power for the elapsed power history period.
 				// If it is the last period of the day writes the history to the flash.
 				histoNext () ;
+			}
 
-				// If the time is not available, and a time update is not in progress
-				// then request a time update
-				// (this may be necessary after a general power outage and the Ethernet box boots up more slowly than the AASun)
-				if (! statusWTest (STSW_TIME_OK)  &&  timeIsUpdated == 0u)
-				{
-					timeUpdateRequest (1) ;
-				}
+			if (timerExpired (TIMER_DATE_IX))
+			{
+				timeNext (NEXT_RETRY) ;				// Delay to retry date/time update is elapsed
+			}
+
+			if (timerExpired (TIMER_ENERGY_IX))
+			{
+				writeTotalEnergyCounters () ;		// Periodic flash backup of total energy counters
 			}
 
 			computedData.vRms       = voltCal * usqrt (acquiredData.voltSumSqr / COLLECTION_COUNT) ;	// VOLT_SHIFT  bits left shifted
@@ -1222,7 +1073,7 @@ while (aaCheckGetChar () != 0)
 				statusWClear (STSW_ADC_OVERFLOW) ;
 			}
 
-			// Temperature sensors
+			// Temperature sensors handling
 			if (ISOPT_TEMPERATURE)
 			{
 				if (tsRequestStatus (TSREQUEST_CHECK))
@@ -1419,6 +1270,7 @@ while (aaCheckGetChar () != 0)
 			aaPrintf ("cldns      Set lan DNS address\n") ;
 			aaPrintf ("cldhcp v   Set lan mode 1=static 2=DHCP\n") ;
 
+			aaPrintf ("cdpy v     Display 0:None  1:SH1106(1.3\")  2:SSD1306(0.96\")\n") ;
 			aaPrintf ("cfp v      Favorite display page\n") ;
 			aaPrintf ("cdr n txt  Set diverting rule n\n") ;
 			aaPrintf ("cfr n txt  Set forcing rules n\n") ;
@@ -1451,7 +1303,10 @@ while (aaCheckGetChar () != 0)
 			aaPrintf ("h dyw      History power dump-today dump-yesterday write\n") ;
 
 			aaPrintf ("time [h m s y m d] Set time (%d)\n", (statusWTest (STSW_TIME_OK) != 0) ? 1 : 0) ;
-			aaPrintf ("ltime [1]  Set time from LAN, optional power histo sync\n") ;
+			aaPrintf ("utime      Set time from available source then power histo sync\n") ;
+			aaPrintf ("ltime [1]  Set time from LAN,   optional power histo sync\n") ;
+			aaPrintf ("wtime [1]  Set time from WIFI,  optional power histo sync\n") ;
+			aaPrintf ("ytime [1]  Set time from Linky, optional power histo sync\n") ;
 			aaPrintf ("reset [boot] Reset MCU [and go bootloader]\n") ;
 aaPrintf ("in         Get input values\n") ;
 aaPrintf ("out n v    Set output n to value v\n") ;
@@ -1605,28 +1460,29 @@ aaPrintf ("df  a      Dump flash\n") ;
 				aaPuts ("clip   ") ;
 				for (ii = 0 ; ii < 4 ; ii++)
 				{
-					aaPrintf (" %3d", aaSunCfg.lanCfg.ip [ii]) ;
+					aaPrintf (" %3u", aaSunCfg.lanCfg.ip [ii]) ;
 				}
 				aaPuts ("\nclmask ") ;
 				for (ii = 0 ; ii < 4 ; ii++)
 				{
-					aaPrintf (" %3d", aaSunCfg.lanCfg.sn [ii]) ;
+					aaPrintf (" %3u", aaSunCfg.lanCfg.sn [ii]) ;
 				}
 				aaPuts ("\nclgw   ") ;
 				for (ii = 0 ; ii < 4 ; ii++)
 				{
-					aaPrintf (" %3d", aaSunCfg.lanCfg.gw [ii]) ;
+					aaPrintf (" %3u", aaSunCfg.lanCfg.gw [ii]) ;
 				}
 				aaPuts ("\ncldns  ") ;
 				for (ii = 0 ; ii < 4 ; ii++)
 				{
-					aaPrintf (" %3d", aaSunCfg.lanCfg.dns [ii]) ;
+					aaPrintf (" %3u", aaSunCfg.lanCfg.dns [ii]) ;
 				}
 				aaPutChar('\n') ;
 				aaPrintf ("cldhcp  %c\n", (aaSunCfg.lanCfg.dhcp) == 1 ? 's' : 'd') ;
 
 				// Miscellaneous configuration
-				aaPrintf ("cfp     %d\n", aaSunCfg.favoritePage) ;
+				aaPrintf ("cdpy    %u\n", aaSunCfg.displayController) ;
+				aaPrintf ("cfp     %u\n", aaSunCfg.favoritePage) ;
 
 				// Anti-legionella
 				if ((aaSunCfg.alFlag & AL_FLAG_EN) == 0)
@@ -1801,11 +1657,11 @@ aaPrintf ("df  a      Dump flash\n") ;
 
 			else if (0 == strcmp ("cpm", pCmd))		// Set power margin
 			{
-				if (pArg1 != NULL  &&  arg1 > 0  &&  arg1 < 2  &&  pArg2 != NULL)
+				if (pArg1 != NULL  &&  arg1 > 0  &&  arg1 < 3  &&  pArg2 != NULL)
 				{
-					powerDiv [arg1].powerMargin = arg2  << POWER_SHIFT ;
+					powerDiv [arg1-1].powerMargin = arg2  << POWER_SHIFT ;
 				}
-				aaPrintf ("Power Margin: %u  %u\n", powerDiv [0].powerMargin >> POWER_SHIFT, powerDiv [1].powerMargin >> POWER_SHIFT) ;
+				aaPrintf ("Power Margin: %d  %d\n", powerDiv [0].powerMargin >> POWER_SHIFT, powerDiv [1].powerMargin >> POWER_SHIFT) ;
 			}
 
 			else if (0 == strcmp ("cpmax", pCmd))	// Set max diverted power
@@ -2136,6 +1992,14 @@ aaPrintf ("df  a      Dump flash\n") ;
 				}
 			}
 
+			else if (0 == strcmp ("cdpy", pCmd))
+			{
+				if (pArg1 != NULL  &&  arg1 >= 0  &&  arg1 < 3)
+				{
+					aaSunCfg.displayController = arg1 ;
+				}
+			}
+
 			else if (0 == strcmp ("cfp", pCmd))		// Set favorite display page
 			{
 				// cfp 1
@@ -2212,6 +2076,11 @@ aaPrintf ("df  a      Dump flash\n") ;
 							// Set Total energy date
 							// To use on the 1st start of the diverter
 							energyWh.date = timeGetDayDate (& localTime) ;
+						}
+						if (statusWTest (STSW_TIME_OK))
+						{
+							// If the date is not available, then the date in the energy structure is false
+							aaPrintf ("Date not set!\n") ;
 						}
 					}
 					break ;
@@ -2402,8 +2271,11 @@ aaPrintf ("df  a      Dump flash\n") ;
 							localTime.yy = arg1 ;
 							localTime.mo = arg2 ;
 							localTime.dd = arg3 ;
+							localTime.wd = timeDateToWd (& localTime) ;
+							bDstWinter = 0 ;
 							statusWSet (STSW_TIME_OK) ;
 							histoStart () ;		// Start/synchronize power history
+							timeNext (true) ;	// Reset date/time update
 							result = true ;
 						}
 					}
@@ -2415,10 +2287,33 @@ aaPrintf ("df  a      Dump flash\n") ;
 			}
 		}
 
-		else if (0 == strcmp ("ltime", pCmd))		// Set time from LAN or Linky
+		else if (0 == strcmp ("utime", pCmd))		// Update date/time then start/sync power history
+		{
+			timeUpdateRequest (1) ;
+		}
+
+		else if (0 == strcmp ("ltime", pCmd))		// Set time from LAN
 		{
 			// If arg1 is present also synchronize power history
-			timeUpdateRequest (pArg1 == NULL ? 0 : 1) ;
+			lanTimeRequest (pArg1 == NULL ? 0 : 1) ;
+		}
+
+		else if (0 == strcmp ("wtime", pCmd))		// Set time from WIFI
+		{
+			if (wifiDateRequest ())
+			{
+				timeIsUpdated = pArg1 == NULL ? 0 : 1 ;
+				aaPuts ("Ok\n") ;
+			}
+			else
+			{
+				aaPuts ("Error\n") ;
+			}
+		}
+
+		else if (0 == strcmp ("ytime", pCmd))		// Set time from Linky
+		{
+			linkyTimeRequest (pArg1 == NULL ? 0 : 1) ;
 		}
 
 		else if (0 == strcmp ("fman", pCmd))		// Set manual order for the forcing
@@ -2528,6 +2423,8 @@ aaPrintf ("df  a      Dump flash\n") ;
 		{
 			// reset			=> MCU reset
 			// reset boot		=> Go to MCU internal downloader
+			writeTotalEnergyCounters () ;				// Save of total energy counters
+			histoWrite (& dayEnergyWh, powerHistory) ;	// Save this day power history
 			if (pArg1 != NULL  &&  0 == strcmp ("boot", pArg1))
 			{
 				bspJumpToBootLoader () ;
@@ -2539,6 +2436,7 @@ aaPrintf ("df  a      Dump flash\n") ;
 		else if (0 == strcmp ("SerEL", pCmd))	//  Switch to flash external loader (not a user command)
 		{
 			diverterStop () ;
+			enableLowProcesses (false) ;
 			SerEL () ;
 			bspResetHardware () ;
 		}
@@ -2639,11 +2537,18 @@ aaPrintf ("df  a      Dump flash\n") ;
 					break ;
 
 				case 'W':	// Write current dayEnergyWh and power history (this add an entry to the history memory)
-					histoWrite (& dayEnergyWh, powerHistory) ;	// New history
+					if (statusWTest (STSW_TIME_OK))
+					{
+						histoWrite (& dayEnergyWh, powerHistory) ;	// New history
+					}
+					else
+					{
+						aaPrintf ("No time...\n") ;
+					}
 					break ;
 
 				case 'Z':
-					histoFlashErase () ;
+					histoFlashErase () ;		// BEWARE: lengthy, should be delegated to lower priority task
 					aaPuts ("Total energy and history erased\n") ;
 					break ;
 

@@ -42,14 +42,16 @@ typedef struct
 #define	TIMER_COUNT			3
 
 extern	softTimer_t			softTimers [TIMER_COUNT] ;
+
 extern	char				* timeDayName []  ;
+extern	bool				bDstWinter ;			// To manage DST
 
 
 #define	TIMER_ENERGY_IX		0						// Write energy counters every TIMER_ENERGY_PERIOD
 #define	TIMER_ENERGY_PERIOD	(2*3600)				// 3600 is an hour: write total energy counters to flash every TIMER_ENERGY_PERIOD seconds
 
-#define	TIMER_DATE_IX		1						//  Update date/time TIMER_DATE_PERIOD seconds after midnight
-#define	TIMER_DATE_PERIOD	(POWER_HISTO_PERIOD/2)
+#define	TIMER_DATE_IX		1						// When a date/time update is requested,
+#define	TIMER_DATE_PERIOD	60						// try every TIMER_DATE_PERIOD seconds until a date source is available
 
 #define	TIMER_HISTO_IX		2						// Update power history every TIMER_HISTO_PERIOD
 #define	TIMER_HISTO_PERIOD	POWER_HISTO_PERIOD
@@ -64,8 +66,12 @@ extern "C" {
 void		timersInit			(void) ;
 
 void		timeInit			(localTime_t * pTime) ;
-uint32_t	timeTick 			(localTime_t * pTime) ;	// To call every second
-uint32_t	timeGetDayDate		(localTime_t * pTime) ;
+uint32_t	timeTick 			(localTime_t * pTime) ;		// To call every second
+void		timeAddHour			(localTime_t * pTime) ;
+uint32_t	timeGetDayDate		(const localTime_t * pTime) ;
+uint32_t 	timeDateToWd		(const localTime_t * lt) ;
+
+uint32_t	dstAdjust			(localTime_t * pTime) ;
 
 //--------------------------------------------------------------------------------
 //	Start a software timer
@@ -96,7 +102,7 @@ __ALWAYS_STATIC_INLINE	void timerStop (uint32_t timerIx)
 
 //--------------------------------------------------------------------------------
 // This function allow to know if the timer as expired, then acknowledges the timer.
-// Then the timer can only be tested once.
+// So the timer can only be tested once.
 
 __ALWAYS_STATIC_INLINE	bool timerExpired (uint32_t timerIx)
 {
@@ -114,7 +120,7 @@ __ALWAYS_STATIC_INLINE	bool timerExpired (uint32_t timerIx)
 uint32_t	usqrt				(uint32_t x) ;
 uint32_t	aaGetsNonBlock		(char * pBuffer, uint32_t size) ;
 uint32_t 	iFracPrint			(int32_t value, uint32_t shift, uint32_t width, uint32_t prec) ;
-uint32_t 	iFracDisplay		(char * buffer, int32_t value, uint32_t shift, uint32_t width, uint32_t prec) ;
+uint32_t 	iFracFormat			(char * buffer, int32_t value, uint32_t shift, uint32_t width, uint32_t prec) ;
 int32_t 	inttoa				(int32_t val, char * pStr, uint32_t len, uint32_t width) ;
 
 bool 		cc64Check			(void) ;
@@ -127,5 +133,5 @@ void		getMacAddress		(uint8_t * pMac) ;
 }
 #endif
 //--------------------------------------------------------------------------------
-#endif	// W25Q_H_
+#endif	// UTIL_H_
 

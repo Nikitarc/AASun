@@ -19,6 +19,21 @@ extern "C" {
 #include "httpServer.h"
 #include "httpParser.h"
 
+// Rewrite http_post_cgi_handler to be common to WIFI and W5500
+typedef struct
+{
+	uint32_t	contentSize ;	// Post request data length
+	char		* data ;		// Post request data
+	uint32_t	* respLen ;		// Length of the response
+	char		* respBuffer ;	// Response buffer
+
+} postCgiParam_t ;
+
+uint8_t http_post_cgi_handler_common (char    * uri_name, postCgiParam_t * pParam) ;
+uint8_t http_get_cgi_handler_common  (uint8_t * uri_name, char * pUriData, uint8_t * buf, uint32_t lenMax, uint32_t * file_len) ;
+
+
+
 uint8_t http_get_cgi_handler(uint8_t * uri_name, uint8_t * buf, uint32_t lenMax, uint32_t * file_len);
 uint8_t http_post_cgi_handler(uint8_t * uri_name, st_http_request * p_http_request, uint8_t * buf, uint32_t * file_len);
 

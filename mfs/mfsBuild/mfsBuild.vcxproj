@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="..\mfs\src\mfs.c" />
     <ClCompile Include="..\utils\getopt.c" />
+    <ClCompile Include="src\crc32.c" />
     <ClCompile Include="src\mfsBuild.c" />
   </ItemGroup>
   <ItemGroup>

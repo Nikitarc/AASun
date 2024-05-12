@@ -19,9 +19,11 @@
 #include	"aa.h"
 #include	"aakernel.h"
 #include	<stdbool.h>
-#include	"spid.h"			// ADC timer synchronization to main cycle
+#include	"spid.h"			// ADC timer PID synchronization to main cycle
 #include	"cfgParameters.h"
 #include	"util.h"
+
+#include	<time.h>			// For struct tm
 
 //--------------------------------------------------------------------------------
 // ADC and timer configuration
@@ -84,9 +86,6 @@
 
 															// The min pulse is 100 us, so the CCR max is: ARR - 100us
 #define	TIMSSR_MAX			(TIMSSR_ARR -(((100u * TIMSSR_CLK_HZ) + 500000u) / 1000000u))		// The max CCR register value
-
-#define	SNTP_TZ				25	// 25: UTC+01:00 France (metropolitan)
-//#define	SNTP_TZ				22	// 22: UTC&#177;00:00 Spain (Canary Islands), Morocco, United Kingdom
 
 //--------------------------------------------------------------------------------
 //	For the pulse counters
@@ -211,7 +210,6 @@ EXTERN	int32_t			meterBase ;			// Energy total from meter
 EXTERN	int32_t			meterVolt ;			// Voltage from meter
 
 EXTERN	localTime_t		localTime ;			// Time management
-EXTERN	bool			bLinkyDateUpdate ;	// Request to Linky to update the date/time
 EXTERN	uint8_t			timeIsUpdated ;		// 0 Idle
 											// 1 Time update in progress
 											// 2 Time is updated, ready to use (synchronize the power history)
@@ -223,6 +221,9 @@ EXTERN	powerH_t		powerHistoryTemp ;		// To accumulate data for the current histo
 EXTERN	uint32_t		powerHistoIx ;
 
 EXTERN	int32_t			aaSunVariable		[AASUNVAR_MAX] ;
+
+EXTERN	uint32_t		wifiSoftwareVersion ;	// Version of the WIFI interface software
+EXTERN	uint32_t		wifiModeAP ;			// True if the WIFI interface is in "Access Point" mode
 
 //--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------
@@ -273,25 +274,44 @@ bool		forceSetManualOrder		(uint32_t index) ;
 typedef void (* ticCallback_t) (uint32_t index, const char * pLabel, char * pSavePtr) ;
 
 void		ticSetCallback			(ticCallback_t pCallback) ;
+void		ticTimeoutStart			(void) ;
 void		ticInit					(void) ;
 void		ticNext					(void) ;
 void		ticToggleDisplay		(void) ;
 
-#define		MODE_HIS		0
-#define		MODE_STD		(MODE_HIS ^ 1u)
-extern		uint8_t			ticMode ;			// MODE_HIS or MODE_STD
+#define		MODE_HIS			0
+#define		MODE_STD			(MODE_HIS ^ 1u)
+extern		uint8_t				ticMode ;			// MODE_HIS or MODE_STD
+
+// In timeUpdate.c
+void		timeUpdateRequest		(uint32_t mode) ;	// Selects the available source for date/time update
+void		lanTimeRequest			(uint32_t mode) ;
+void		linkyTimeRequest		(uint32_t mode) ;
+
+void		timeUpdateTic			(char * pStr)  ;	// Callback from linky
+void		timeUpdateWifi			(struct tm * pTm) ;	// callback from WIFI
+
+typedef enum
+{
+	NEXT_START	= 0,		// Start a date/time update
+	NEXT_RETRY,				// Try next date/time source
+	NEXT_RESET				// Update done, reset the state machine
+
+} nextComman_t ;
+
+void		timeNext				(nextComman_t command) ;	// The date/time update state machine
 
 // In SerEL.c : serial download of HTTP file system
-void		SerEL			(void) ;
+void		SerEL					(void) ;
 
 // Indexes of required Linky TIC information (order in the pTicLabel array)
-#define		TIC_IDX_DATE	0
-#define		TIC_IDX_EAST	1
-#define		TIC_IDX_SINSTS	2
-#define		TIC_IDX_UMOY1	3
+#define		TIC_IDX_DATE		0
+#define		TIC_IDX_EAST		1
+#define		TIC_IDX_SINSTS		2
+#define		TIC_IDX_UMOY1		3
 
-#define		TIC_IDX_BASE	4
-#define		TIC_IDX_PAPP	5
+#define		TIC_IDX_BASE		4
+#define		TIC_IDX_PAPP		5
 
 //--------------------------------------------------------------------------------
 //	For debug: Fast setting of test points
@@ -333,14 +353,14 @@ __ALWAYS_STATIC_INLINE	void	tst2_1 (void)
 // statusWord bits values
 
 // Displayed on line A
-#define	STSW_NORMAL				0x00000001			// Running in standard condition
-#define	STSW_STOPPED			0x00000002			// Running in stopped  condition
-#define	STSW_DIV_ENABLED		0x00000004			// The state of the diverter (on/off)
-#define	STSW_DIVERTING			0x00000008			// Some energy is diverted
-#define	STSW_LINKY_ON			0x00000010			// The Linky TIC is managed
-#define	STSW_TIME_OK			0x00000020			// Time is initialized
-#define	STSW_PWR_HISTO_ON		0x00000040			// Power history on
-#define	STSW_W5500_EN			0x00000080			// W5500 LAN chip present
+#define	STSW_DIV_ENABLED		0x00000001			// The state of the diverter (on/off)
+#define	STSW_DIVERTING			0x00000002			// Some energy is diverted
+#define	STSW_LINKY_ON			0x00000004			// The Linky TIC is managed
+#define	STSW_TIME_OK			0x00000008			// Time is initialized
+#define	STSW_PWR_HISTO_ON		0x00000010			// Power history on
+#define	STSW_W5500_EN			0x00000020			// W5500 LAN chip present
+#define	STSW_WIFI_EN			0x00000040			// WIFI connected
+#define	STSW_RESERVED			0x00000080			//
 
 // Displayed on line B
 #define	STSW_NOT_SYNC			0x00000100			// Not synchronized to main period

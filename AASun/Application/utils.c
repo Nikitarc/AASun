@@ -20,6 +20,9 @@
 #include	"string.h"
 
 //----------------------------------------------------------------------
+
+bool				bDstWinter ;			// To manage DST
+
 //----------------------------------------------------------------------
 // Software timer management
 
@@ -43,7 +46,7 @@ void	timersInit	(void)
 }
 
 //----------------------------------------------------------------------
-// To call every second
+// To call every second for software timer management
 
 static	void	timersTick	(void)
 {
@@ -65,47 +68,11 @@ static	void	timersTick	(void)
 	}
 }
 
+//--------------------------------------------------------------------------------
 //----------------------------------------------------------------------
-//----------------------------------------------------------------------
-// Date/Time management
-/*
-// Daylight saving time calendar from 2023 to 2043
-typedef struct
-{
-	uint8_t		yy ;	// The 2 last numbers of the year
-	uint8_t		on ;	// The day of march to set summer hour
-	uint8_t		off ;	// The day of october to set winter hour
-} dst_t ;
+// Local date/time management
 
-const dst_t		dstCalendar [] =
-{
-	{ 22, 27, 30 },
-	{ 23, 26, 29 },
-	{ 24, 31, 27 },
-	{ 25, 30, 26 },
-	{ 26, 29, 25 },
-	{ 27, 28, 31 },
-	{ 28, 26, 29 },
-	{ 29, 25, 28 },
-	{ 30, 31, 27 },
-	{ 31, 30, 26 },
-	{ 32, 28, 31 },
-	{ 33, 27, 30 },
-	{ 34, 26, 29 },
-	{ 35, 25, 28 },
-	{ 36, 30, 26 },
-	{ 37, 29, 25 },
-	{ 38, 28, 31 },
-	{ 39, 27, 30 },
-	{ 40, 25, 28 },
-	{ 41, 31, 27 },
-	{ 42, 30, 26 },
-	{ 43, 29, 25 },
-};
-
-const uint8_t	dstMax = sizeof (dstCalendar) / sizeof (dst_t) ;
-*/
-//----------------------------------------------------------------------
+// Initialize a localTime_t structure
 
 void	timeInit (localTime_t * pTime)
 {
@@ -114,43 +81,145 @@ void	timeInit (localTime_t * pTime)
 	pTime->mo = 1 ;
 	pTime->yy = 2023 ;
 	pTime->wd = 0 ;		// Sunday
+	bDstWinter = 0 ;
 }
 
 //----------------------------------------------------------------------
-// Return a word with the day date
+// Return a word with the day date: year, month, day
 
-uint32_t	timeGetDayDate (localTime_t * pTime)
+uint32_t	timeGetDayDate (const localTime_t * pTime)
 {
 	return (pTime->yy << 16) + (pTime->mo << 8) + (pTime->dd) ;
 }
 
-//----------------------------------------------------------------------
-//	Test for Daylight Saving Time change. Returns:
-//		 0 : no change
-//		+1 : Switch to summer time (last Sunday of march),   move the clock forward
-//		-1 : Switch to winter time (last Sunday of october), move the clock backward
+//--------------------------------------------------------------------------------
+//  Return 1 if the date is in winter Daylight Saving Time
+//	Central europe only:
+//		Switch to summer time on last Sunday of March.   At 02:00:00 add 1 hour
+//		Switch to winter time on last Sunday of October. At 03:00:00 remove 1 hour
 
-int32_t		timeDstChange (localTime_t * pTime)
+uint32_t	dstAdjust (localTime_t * pTime)
 {
-	if (pTime->mm == 3  &&  pTime->dd > 24  &&  pTime->wd == 0)
+	uint32_t	dst = 0 ;
+
+	if (pTime->mo == 3  &&  pTime->dd > 24)
 	{
-		return +1 ;	// Switch to summer time
+		// Last week of March
+		dst += pTime->wd <= (pTime->dd - 25) ;
+		if (pTime->wd == 0)
+		{
+			// The day to switch to summer time, only after 02:00:00
+			if (pTime->hh < 2)
+			{
+				dst-- ;
+			}
+		}
 	}
-	if (pTime->mm == 10  &&  pTime->dd > 24  &&  pTime->wd == 0)
+	else if (pTime->mo >= 4)
 	{
-		return -1 ;	// Switch to winter time
+		dst++ ;
+		if (pTime->mo > 10)
+		{
+			dst-- ;
+		}
+		else if (pTime->mo == 10  &&  pTime->dd > 24)
+		{
+			// Last week of October
+			dst -= pTime->wd <= (pTime->dd - 25) ;
+			if (pTime->wd == 0)
+			{
+				// The day to switch to winter time, only after 03:00:00
+				if (pTime->hh < 3)
+				{
+					dst++ ;
+				}
+			}
+		}
 	}
-	return 0 ;
+
+	if (dst > 0)
+	{
+		timeAddHour (pTime) ;
+	}
+	return dst ;
 }
 
 //----------------------------------------------------------------------
-// This calendar works from 2001 until 2099
-// return 1 at 00:00:00
-uint32_t	timeTick (localTime_t * pTime)
+// Compute week day from date (Gregorian calendar)
+// Sakamoto's methods https://en.wikipedia.org/wiki/Determination_of_the_day_of_the_week
+// https://www.quora.com/How-does-Tomohiko-Sakamotos-Algorithm-work
+// Slightly modified to use only 1 division and 1 modulo
+
+uint32_t timeDateToWd (const localTime_t * lt)
+{
+    uint32_t	i, y, y100 ;
+    uint8_t		t [12] = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4} ;
+                      //{ 0, 3, 3, 6, 1, 4, 6, 2, 5, 0, 3, 5} ;
+    y = lt->yy - (lt->mo < 3) ;		// (lt->mo < 3) is 1 or 0
+	y100 = y/100 ;
+	i = (y + y/4 - y100 + (y100>>2) + t[lt->mo-1] + lt->dd) % 7 ;
+    return i;
+}
+
+//--------------------------------------------------------------------------------
+//	Add 1 hour to the date
+//	This is used to adjust winter Daylight Saving Time
+
+void	timeAddHour (localTime_t * pTime)
 {
 	int8_t		dd, mo ;
 
-	// Update local time
+	pTime->hh++ ;
+	if (pTime->hh == 24)
+	{
+		pTime->hh = 0u ;
+		pTime->wd++ ;
+		if (pTime->wd == 7)
+		{
+			pTime->wd = 0 ;
+		}
+
+		dd = pTime->dd + 1 ;
+		mo = pTime->mo ;
+
+		if (dd == 32)
+		{
+			dd = 1 ;
+			mo ++ ;
+		}
+		if (dd == 31  &&  ( mo == 4 || mo == 6 || mo == 9 || mo == 11))
+		{
+			dd = 1 ;
+			mo ++ ;
+		}
+		if (dd == 30  &&  (mo == 2))
+		{
+			dd = 1 ;
+			mo ++ ;
+		}
+		if ((dd == 29)  &&  (mo == 2)  &&  ((pTime->yy %4) != 0))
+		{
+			dd = 1 ;
+			mo ++ ;
+		}
+		if (mo == 13)
+		{
+			mo = 1 ;
+			pTime->yy++ ;
+		}
+		pTime->dd = dd ;
+		pTime->mo = mo ;
+	}
+}
+
+//----------------------------------------------------------------------
+// This calendar works from 2001 until 2099 (no special care of leap years)
+// return the time
+// On the day of the changeover to winter time it will be 2 times 3 o'clock! But you only have to turn back the clock once...
+// bDstWinter is used to manage this feature
+
+uint32_t	timeTick (localTime_t * pTime)
+{
 	pTime->ss ++ ;
 	if (pTime->ss == 60)
 	{
@@ -159,52 +228,32 @@ uint32_t	timeTick (localTime_t * pTime)
 		if (pTime->mm == 60)
 		{
 			pTime->mm = 0u ;
-			pTime->hh++ ;
-			if (pTime->hh == 24)
+
+			// Daylight Saving Time (European only)
+			// Here pTime->mm == 0  and  pTime->ss == 0
+			if (pTime->dd > 24  &&  pTime->wd == 0)
 			{
-				pTime->hh = 0u ;
-				pTime->wd++ ;
-				if (pTime->wd == 7)
+				if (pTime->mo == 3  &&  pTime->hh == 1)
 				{
-					pTime->wd = 0 ;
+					pTime->hh++ ;	// Switch to summer time
 				}
-
-				dd = pTime->dd + 1 ;
-				mo = pTime->mo ;
-
-				if (dd == 32)
+				else if (pTime->mo == 10  &&  pTime->hh == 2)
 				{
-					dd = 1 ;
-					mo ++ ;
+					// On the day of the changeover to winter time it will be 2 times 3 o'clock
+					// But you only have to turn back the clock once.
+					if (! bDstWinter)
+					{
+						pTime->hh-- ;	// Switch to winter time
+					}
+					bDstWinter ^= 1 ;
 				}
-				if (dd == 31  &&  ( mo == 4 || mo == 6 || mo == 9 || mo == 11))
-				{
-					dd = 1 ;
-					mo ++ ;
-				}
-				if (dd == 30  &&  (mo == 2))
-				{
-					dd = 1 ;
-					mo ++ ;
-				}
-				if ((dd == 29)  &&  (mo == 2)  &&  ((pTime->yy %4) != 0))
-				{
-					dd = 1 ;
-					mo ++ ;
-				}
-				if (mo == 13)
-				{
-					mo = 1 ;
-					pTime->yy++ ;
-				}
-				pTime->dd = dd ;
-				pTime->mo = mo ;
 			}
+			timeAddHour (pTime) ;
 		}
 	}
 	// Update timers
 	timersTick () ;
-	return (pTime->hh | pTime->mm | pTime->ss) == 0u ;
+	return (pTime->hh << 16) | (pTime->mm << 8) | pTime->ss ;
 }
 
 //----------------------------------------------------------------------
@@ -635,16 +684,16 @@ uint32_t	aaGetsNonBlock		(char * pBuffer, uint32_t size)
 }
 
 //------------------------------------------------------------------
-//	Display an integer fixed point notation: x.shift or Qshift
+//	Format an integer with fixed point notation: x.shift or Qshift
 //	The returned value is the count of output chars : width+prec+1    (1 for the dot)
 //	The width is the count of digits before the dot, and prec the count of digits after the dot
-//	BEWARE: the size of the buffer is not checked, and must be large enough
+//	BEWARE: the size of the result buffer is not checked, and must be large enough
 
 // https://www.i-programmer.info/programming/cc/13669-applying-c-fixed-point-arithmetic.html?start=2
 
 static	const char  iFracDisplay_ [] = { "          -0" } ;
 
-uint32_t 	iFracDisplay (char * buffer, int32_t value, uint32_t shift, uint32_t width, uint32_t prec)
+uint32_t 	iFracFormat (char * buffer, int32_t value, uint32_t shift, uint32_t width, uint32_t prec)
 {
 	int32_t		integer  = value >> shift ;
 	uint32_t	frac     = value & ((1u << shift) - 1u) ;
@@ -711,8 +760,7 @@ uint32_t 	iFracPrint (int32_t value, uint32_t shift, uint32_t width, uint32_t pr
 {
 	uint32_t	len ;
 
-	len = iFracDisplay (iFracBuffer, value, shift, width, prec) ;
-	iFracBuffer [len] = 0 ;
+	len = iFracFormat (iFracBuffer, value, shift, width, prec) ;
 	aaPuts (iFracBuffer) ;
 	return len ;
 }
@@ -769,7 +817,7 @@ int32_t 	inttoa (int32_t val, char * pStr, uint32_t len, uint32_t width)
 		pStr [w++] = '-' ;
 	}
 
-	// Fill to rich the required width
+	// Fill to reach the required width
 	while (w < width)
 	{
 		pStr [w++] = ' ' ;

@@ -15,7 +15,7 @@
 
 #include	"AASun.h"
 #include	"temperature.h"
-#include	"SH1106.h"		// For IO access
+#include	"display.h"		// For IO access
 
 #include	"aautils.h"
 

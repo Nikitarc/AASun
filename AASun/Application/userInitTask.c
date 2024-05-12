@@ -26,10 +26,13 @@ void		AASun			(void) ;
 //----------------------------------------------------------------------
 //	The first user task
 
+void	wifiTest (void) ;
+
 void	userInitTask (uintptr_t arg)
 {
 	(void) arg ;	// Unused arg
 
+//	wifiTest () ;
 	AASun () ;		// Never return
 }
 

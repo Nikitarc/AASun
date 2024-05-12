@@ -841,7 +841,6 @@ void UART_IRQHandler	(uartDesc_t * pUart) ;
 void UART_IRQHandler	(uartDesc_t * pUart)
 {
 	volatile USART_TypeDef	* uartBase = pUart->uartBase ;	// UARTx
-	aaTcb_t					* pTcb ;
 	uint16_t				cc ;
 
 	aaIntEnter () ;
@@ -871,14 +870,7 @@ void UART_IRQHandler	(uartDesc_t * pUart)
 		// Clear Overrun interrupt flag generated at the same time as RXNE
 		uartBase->ICR = USART_ICR_ORECF ;
 
-		aaCriticalEnter () ;
-		if (aaIsIoWaitingTask (& pUart->rxList) != 0u)
-		{
-			// A thread is waiting for RX char, awake it
-			pTcb = aaIoResume (& pUart->rxList) ;
-			(void) pTcb ;
-		}
-		aaCriticalExit () ;
+		(void) aaIoResumeWaitingTask (& pUart->rxList) ;
 	}
 
 	// -------------- TXE handler
@@ -919,14 +911,7 @@ void UART_IRQHandler	(uartDesc_t * pUart)
 				}
 			}
 
-			aaCriticalEnter () ;
-			if (aaIsIoWaitingTask (& pUart->txList) != 0u)
-			{
-				// A thread is waiting for TX space, awake it
-				pTcb = aaIoResume (& pUart->txList) ;
-				(void) pTcb ;
-			}
-			aaCriticalExit () ;
+			aaIoResumeWaitingTask (& pUart->txList) ;
 		}
 		else
 		{

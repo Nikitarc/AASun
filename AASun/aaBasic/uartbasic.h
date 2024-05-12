@@ -57,7 +57,7 @@
 //	UART package configuration: Enabled UARTs/USARTs are defined to 1
 
 // Don't set to 1 the USART not present in the used MCU
-#define	WITH_UART1		0	// WIFI
+#define	WITH_UART1		0	// WIFI (not managed by uartbasic)
 #define	WITH_UART2		1	// Console
 #define	WITH_UART3		0	// Temperature (not managed by uartbasic)
 #define	WITH_UART4		0

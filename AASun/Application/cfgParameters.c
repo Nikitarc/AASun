@@ -72,7 +72,8 @@ static const configParameters_t cfgDefault =
 	{{ 0 }},					// forceRules (all OFF)
 	0, 0,						// Anti-legionella
 
-	0, 0, { 0 },				// Reserved
+	0,							// Display controller none
+	0, { 0 },					// Reserved
 	0							// ckSum
 } ;
 
@@ -470,7 +471,7 @@ if (ix >= POWER_HISTO_MAX)
 	if (bStarted  &&  ix < powerHistoIx)
 	{
 		// Jump back, clear the data ((daylight saving: 1 hour history lost)
-		memset (& powerHistory [ix], 0, ((powerHistoIx - ix) + 1) * sizeof (powerHistory)) ;
+		memset (& powerHistory [ix], 0, ((powerHistoIx - ix) + 1) * sizeof (powerH_t)) ;
 	}
 	powerHistoIx  = ix ;
 	memset (& powerHistoryTemp, 0, sizeof (powerHistoryTemp)) ;

@@ -25,6 +25,9 @@
     --itemSize:   110px;
     --unitSize:   40px ;
     --groupWidth: calc(var(--labelSize) + var(--itemSize) + var(--unitSize) + 28px) ;
+
+    --credLabelSize:  calc((var(--groupWidth) / 3) - 10px) ;
+    --credItemSize:   calc(var(--credLabelSize) * 2 ) ;
 }
 
 /* textarea, input, button, select, doesn't inherit font */
@@ -174,12 +177,28 @@ button:disabled, button[disabled] {
     min-width: var(--labelSize) ;
     max-width: var(--labelSize) ;
     margin-left: 6px;
-
 }
 .ihw {      /* Data input */
     display: inline-block;
     min-width: var(--itemSize) ;
     max-width: var(--itemSize) ;
+    margin-top: 6px;
+    text-align: right ;
+    font-size: 1em ;
+    height: 1em ;
+    /* padding: 0 ; */
+}
+.lcred {      /* Credential label */
+    display: inline-block;
+    /* display: inline; */
+    min-width: var(--credLabelSize) ;
+    max-width: var(--credLabelSize) ;
+    margin-left: 6px;
+}
+.icred {      /* Credential input */
+    display: inline-block;
+    min-width: var(--credItemSize) ;
+    max-width: var(--credItemSize) ;
     margin-top: 6px;
     text-align: right ;
     font-size: 1em ;

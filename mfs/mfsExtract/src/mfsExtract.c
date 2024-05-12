@@ -207,6 +207,12 @@ int	main (int argc, char ** argv)
 
 	fclose (imgFs) ;
 	printf ("Directory count: %8u\nFile count:      %8u\n", dirCount, fileCount) ;
+	{
+		uint32_t crc, size ;
+		mfsGetCrc (& mfsCtx, & crc, & size) ;
+		printf ("File size:       %8u\nFile CRC:      0x%08X\n", size, crc) ;
+	}
+
 	return 1 ;
 }
 

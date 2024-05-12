@@ -5,13 +5,14 @@
 
 	Alain Chebrou
 
-	AASun.c		Energy metering/diverting
+	SerEl.c		Write HTTP file system to the external flash
 
 	When		Who	What
 	10/10/22	ac	Creation
 	18/02/23	ac	port to PCB V1
 	04/09/23	ac	Use modified PCB V1: Linky on LPUART1 and pin PB10 =>
 	 	 	 	 	allows to use Linky AND pulse counter 2 AND temperature sensors
+	01/05/24	ac	Doesn't use malloc anymore
 
 ----------------------------------------------------------------------
 */
@@ -75,7 +76,7 @@ static	bool	sendAck ()
 
 void	SerEL (void)
 {
-	uint8_t		* pData = aaMalloc (BLOCK_SIZE) ;
+	uint8_t		* pData = getWizBuffer () ;
 	messUnion_t	mess ;
 
 	aaTaskDelay (1000) ;	// wait until all chars are echoed (empty uart buffer)
@@ -169,7 +170,6 @@ void	SerEL (void)
 			sendAck () ;
 		}
 	}
-	aaFree (pData) ;
 }
 
 //--------------------------------------------------------------------------------

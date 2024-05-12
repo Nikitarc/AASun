@@ -125,10 +125,6 @@ int	jsmnTest (void) ;
 
 int	main ()
 {
-	dateTest () ;
-//	jsmnTest () ;
-	return ;
-
 	// Open the MFS filesystem image
 	imgFs = fopen (imageMfs, "rb") ;
 	if (imgFs == NULL)

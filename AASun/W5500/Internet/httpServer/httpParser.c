@@ -271,7 +271,7 @@ uint8_t get_http_uri_name(uint8_t * uri, uint8_t * uri_buf)
 	// Exclude / only if it is at the end
 	if (len != 1  &&  uri_ptr[len-1] == '/')
 	{
-		len-- ;		// exclude '/?' from the name
+		len-- ;		// exclude ending '/?' from the name
 	}
 	strncpy ((char *) uri_buf, uri_ptr, len) ;
 	uri_buf [len] = 0 ;

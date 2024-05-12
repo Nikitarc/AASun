@@ -1,15 +1,20 @@
-// The version of the AASun WWW pages package
-// V 0.3  1st Release
-// V 0.4  pchart.js : error for png button
-//        Add round for version display
-// V 0.5  Add CT3 CT4 (Config, diverter)
-// V 0.6  Sequential message request
-// V 0.7  Add diverter 2
-// V 0.8  Add forcing: forcing.html forcing.js
-//        Better sendToServer() getServerData()
-//        7 days power and energy history
-
-let versionString = "0.8" ;
+/*
+    The version of the AASun WWW pages package
+    V 0.3   1st Release
+    V 0.4   pchart.js : error for png button
+            Add rounding for version display
+    V 0.5   Add CT3 CT4 (Config, Diverter)
+    V 0.6   Sequential message request
+    V 0.7   Add diverter 2
+    V 0.8   Add forcing: forcing.html forcing.js
+            Better sendToServer() getServerData()
+            31 days power and energy history
+    V 0.9   Status word updated (WIFI)
+    V 0.10  Bug in diverter On/Off button (Status word modified for WIFI)
+            Add display selector in Config
+            Add WIFI credential page
+*/
+let versionString = "0.10" ;
 
 function getFooterString () { return "AASun - AdAstra-Soft" ; }
 
@@ -35,6 +40,7 @@ const midForcingManual      = 15 ;
 const midResetEnergyTotal   = 16 ;
 const midSetVar			    = 17 ;
 const midSetAl			    = 18 ;
+const midSetDisplay			= 19 ;
 
 export
 {
@@ -57,6 +63,7 @@ export
     midResetEnergyTotal,
     midSetVar,
     midSetAl,
+    midSetDisplay,
 } ;
 
 //------------------------------------------------------------------

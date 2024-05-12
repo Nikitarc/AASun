@@ -19,13 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\date.c" />
-    <ClCompile Include="src\jsmn.c" />
     <ClCompile Include="src\mfs.c" />
     <ClCompile Include="src\mfsTest.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\jsmn.h" />
     <ClInclude Include="src\mfs.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -105,7 +102,7 @@
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader />
       <WarningLevel>Level3</WarningLevel>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
     <Link>

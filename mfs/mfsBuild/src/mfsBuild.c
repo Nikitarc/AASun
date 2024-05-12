@@ -24,6 +24,10 @@
 
 #include	"mfs.h"
 
+// in crc.c
+uint32_t crc32Init	(void) ;
+uint32_t crc32		(uint32_t crc, const char * s, size_t n) ;
+
 //--------------------------------------------------------------------------------
 
 
@@ -38,11 +42,11 @@ typedef struct
 
 } dirCtx_t ;
 
+// Default arguments values
 char			* src = "AASun_web" ;		// Source directory path
 char			* dst = "AASun_web.bin" ;	// Destination image path
 
 FILE			* dstFile ;
-FILE			* srcFile ;
 
 // The logical block size to use for the filesystem
 // It is different from FLASH erase block size
@@ -51,6 +55,8 @@ uint32_t		blockPower2 ;			// 2^blockPower2 = blockSize
 
 uint8_t			* pDataBlock ;
 uint32_t		lastBlock ;				// This is always the bock num past the end of the file
+
+mfsSuperBloc_t	* pSuperBloc ;
 
 // Convert a block number to a physical address
 #define			bloc2DirAddr(blocNum)		((mfsDirHdr_t *) (blocNum << blockPower2))		
@@ -330,13 +336,19 @@ int	main (int argc, char ** argv)
 	// Write super block: 1st block in the image
 	lastBlock = 0 ;
 	{
-		mfsSuperBloc_t	* pBlock = (mfsSuperBloc_t *) pDataBlock ;
-		pBlock->version     = MFS_FS_VERSION ;
-		pBlock->magic       = MFS_SB_MAGIC ;
-		pBlock->blockSize   = blockSize ;
-		pBlock->blockPower2 = blockPower2 ;
-		strcpy (pBlock->text, "MFS: Minimalist FileSystem") ;
-		fwrite (pDataBlock, blockSize, 1, dstFile) ;
+		pSuperBloc = (mfsSuperBloc_t *) malloc (blockSize) ;
+		if (pSuperBloc == NULL)
+		{
+			printf ("Malloc error\n") ;
+			return 0 ;
+		}
+		memset (pSuperBloc, 0, blockSize) ;
+		pSuperBloc->version     = MFS_FS_VERSION ;
+		pSuperBloc->magic       = MFS_SB_MAGIC ;
+		pSuperBloc->blockSize   = blockSize ;
+		pSuperBloc->blockPower2 = blockPower2 ;
+		strcpy (pSuperBloc->text, "MFS: Minimalist FileSystem") ;
+		fwrite (pSuperBloc, blockSize, 1, dstFile) ;
 		lastBlock++ ;
 	}
 
@@ -350,10 +362,28 @@ int	main (int argc, char ** argv)
 	build (pRootCtx, src) ;		// Build the MFS filesystem
 
 	releaseDirCtx (pRootCtx) ;
-	free (pDataBlock) ;
+
+	// Compute file CRC excluding the 1st block (supe block containing the CRC)
+	fseek  (dstFile, blockSize, SEEK_SET) ;
+	pSuperBloc->fsCRC = crc32Init () ;
+	while (fread (pDataBlock, blockSize, 1, dstFile) != 0)
+	{
+		pSuperBloc->fsCRC = crc32 (pSuperBloc->fsCRC, (char *) pDataBlock, blockSize) ;
+	}
+	pSuperBloc->fsSize = lastBlock * blockSize ;
+
+	fseek  (dstFile, 0, SEEK_SET) ;
+	fwrite (pSuperBloc, blockSize, 1, dstFile) ;
 
 	printf ("Directory count: %8u\nFile count:      %8u\n", dirCount, fileCount) ;
-	printf ("Block size %u\n", blockSize) ;
+	printf ("File size:       %8u\nCrc:           0x%08X\n", pSuperBloc->fsSize, pSuperBloc->fsCRC) ;
+	printf ("Block size:      %8u\n", blockSize) ;
+
+	free (pSuperBloc) ;
+	free (pDataBlock) ;
+
+	fclose (dstFile) ;
+
 	return 1 ;
 }
 

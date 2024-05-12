@@ -3,24 +3,28 @@
 
 	Alain Chebrou
 
-	SH1106.c	Simplified library for 128x64 OLED display with SH1106 controller IC
+	SH1106.c	Simplified library for 128x64 OLED display with SH1106/SSD1306 controller IC
 				To display text with 7x8 (8 lines) or 9x16 (4 lines) fonts.
 				Can display simple bitmap
-				SPI interface only with DMA (No I2C)
+				SPI interface only, with DMA (No I2C)
 				Use 1KB of RAM as screen buffer
 
 				Buttons        processing
 				Pulse counters processing
 				Digital input  processing
+				Manage display page content
 
 	When		Who	What
 	07/12/22	ac	Creation
 	16/06/23	ac	Add DMA to displayUpdate() => screen update < 1ms
+	05/05/24	ac	Add SSD1306 controller driver (0.96" OLED display)
 
 
 				for SSD1306:
 				https://github.com/tejashwikalptaru/ssd1306xled/blob/master/ssd1306xled.cpp
 				https://github.com/gzone0111/STM32_MPU6050_WITH_OLED_SSD1315/blob/main/Core/Src/ssd1306.c
+				https://www.electronicwings.com/sensors-modules/ssd1306-oled-display
+				https://picaxeforum.co.uk/threads/fyi-comparing-the-ssd1306-and-sh1106-oled-drivers.32387/
 
 ----------------------------------------------------------------------
 */
@@ -30,7 +34,7 @@
 #include "gpiobasic.h"
 
 #include "AASun.h"
-#include "SH1106.h"
+#include "display.h"
 #include "spi.h"
 #include "util.h"
 
@@ -62,6 +66,7 @@
 
 //--------------------------------------------------------------------------------
 
+#define SSD1306_SETLOWCOLUMN	0x00	// CMD Set Lower  Column Address (2 because SH1106 has a X origin offset of 2!!!)
 #define SH1106_SETLOWCOLUMN		0x02	// CMD Set Lower  Column Address (2 because SH1106 has a X origin offset of 2!!!)
 #define SH1106_SETHIGHCOLUMN	0x10	// CMD Set Higher Column Address
 #define	SH1106_SETPAGEADDR		0xB0	// CMD Set Page Address
@@ -93,13 +98,12 @@ static uint8_t displayBuffer[1024] ;
 
 //--------------------------------------------------------------------------------
 // This package defines 2 fonts
-// A small font  7x8 : use 1 page height
-// A big   font 9x16 : use 2 page height
+// A small font  7x8 : use 1 page height, 128 / 7 = 18 char per display line
+// A big   font 9x16 : use 2 page height, 128 / 9 = 14 char per display line
 
 // The characters top can only be set on Y page boundary (0, 8, 16...)
 // For small font the maximum Y is 56, for the big font the maximum Y is 48.
 // The displayChar() function enforce this limit.
-// 128 / 7 = 18 char per display line
 
 #define	FONT_SMALL_W	7					// Pixel
 #define	FONT_SMALL_H	8					// Pixel
@@ -422,7 +426,7 @@ void	displayChar (char cc)
 
 //--------------------------------------------------------------------------------
 //	Very simple bitmap display
-//	The height and Y position of the bitmap must be a multiple of DISPLAY_PAGE_SIZE
+//	The height and Y position of the bitmap must be a multiple of page height (8 bits)
 //	Use displaySetPos() to set the top/left corner of the bitmap
 //	BEWARE: There is no displayBuffer overflow protection
 
@@ -456,7 +460,7 @@ void	displayString (const char * pStr)
 
 //--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------
-// Send a command
+// Send a command to the controller
 
 static	void displayWrCmd (unsigned data)
 {
@@ -467,7 +471,7 @@ static	void displayWrCmd (unsigned data)
 }
 
 //--------------------------------------------------------------------------------
-// Send a data
+// Send a data to the controller
 // Rarely used, so add used attribute to avoid compiler warning
 
 static	__attribute__ ((used)) void displayWrData (unsigned cmd)
@@ -511,7 +515,7 @@ void displaySetCharPos (unsigned char pos, unsigned char line)
 void displayOn (void)
 {
 	displayWrCmd (0x8D) ;  // SET DCDC...
-	displayWrCmd (0x14) ;  // DCDC ON
+	displayWrCmd (0x14) ;  //     DCDC ON
 	displayWrCmd (0xAF) ;  // DISPLAY ON
 }
 
@@ -521,7 +525,7 @@ void displayOn (void)
 void displayOff (void)
 {
 	displayWrCmd (0x8D) ;  // SET DCDC...
-	displayWrCmd (0x10) ;  // DCDC OFF
+	displayWrCmd (0x10) ;  //     DCDC OFF
 	displayWrCmd (0xAE) ;  // DISPLAY OFF
 }
 
@@ -553,38 +557,44 @@ void displaySetPixel (unsigned char x, unsigned char y, unsigned char color)
 }
 
 //--------------------------------------------------------------------------------
-// Update the physical screen from the local screen buffer
+// Update the physical screen from the local screen buffer with DMA
 
 void displayUpdate (void)
 {
 	uint32_t	ii ;
 	uint8_t		* pByte ;
 	
-	pByte = displayBuffer ;
-	for (ii = 0 ; ii < DISPLAY_PAGE_COUNT ; ii++)
+	if (aaSunCfg.displayController == DISPLAY_SSD1306)
 	{
+		// SSD1306: Use horizontal addressing mode, can update the screen with only 1 DMA burst
 		// Set start of page and column
-		displayWrCmd (SH1106_SETPAGEADDR + ii) ;	// Setting page address 0~7
-		displayWrCmd (SH1106_SETLOWCOLUMN) ;		// Set display position-column low address
-		displayWrCmd (SH1106_SETHIGHCOLUMN) ;		// Set display position-column high address
+		displayWrCmd (0xB0) ;	// Setting page address 0
+		displayWrCmd (0x10) ;	// Set display position-column high nibble
+		displayWrCmd (0x00) ;	// Set display position-column low  nibble
 
-		// Send one page of data
 		dcData () ;
 		csSet () ;
-#if (1)
-		// With DMA
-		spiScreenDmaXfer (DISPLAY_WIDTH, pByte) ;
-		pByte += DISPLAY_WIDTH ;
-#else
-		// Without DMA
-		pByte = & displayBuffer [ii * DISPLAY_WIDTH] ;
-		for (uint32_t nn = 0 ; nn < DISPLAY_WIDTH ; nn++)
-		{
-			spiTxByteFast (displaySpi, * pByte++) ;
-		}
-		spiWaitTxEnd (displaySpi) ;
-#endif
+		spiScreenDmaXfer (DISPLAY_WIDTH*8, displayBuffer) ;
 		csReset () ;
+	}
+	else if (aaSunCfg.displayController == DISPLAY_SH1106)
+	{
+		// SH1106: use page addressing mode, 1 DMA burst for every page
+		pByte = displayBuffer ;
+		for (ii = 0 ; ii < DISPLAY_PAGE_COUNT ; ii++)
+		{
+			// Set start of page and column
+			displayWrCmd (SH1106_SETPAGEADDR + ii) ;	// Setting page address 0~7
+			displayWrCmd (SH1106_SETHIGHCOLUMN) ;		// Set display position-column high nibble
+			displayWrCmd (SH1106_SETLOWCOLUMN) ;		// Set display position-column low  nibble
+
+			// Send one page of data
+			dcData () ;
+			csSet () ;
+			spiScreenDmaXfer (DISPLAY_WIDTH, pByte) ;
+			pByte += DISPLAY_WIDTH ;
+			csReset () ;
+		}
 	}
 }
 
@@ -633,160 +643,96 @@ static	void	displaySpiGive	(void)
 }
 
 //--------------------------------------------------------------------------------
-// Initialize SH1106 display control IC
+// Display controller initialization
+
+static const uint8_t	SH1106_Config [] =
+{
+	0xAE,			// Set Display ON/OFF - AE=OFF, AF=ON
+	0x8D, 0x10,		// Charge Pump Setting, 14h = Enable Charge Pump
+	0x40,			// Set start line address, determine the initial display line or COM0
+	0x81, 0xCF,		// Set contrast control register
+#if (DISPLAY_FLIP == 0)
+	0xA1,			// Set SEG/Column Mapping     0xA0 Invert left/right, 0xA1 normal
+	0xC8,			// Set COM/Row Scan Direction 0xC0 Invert top/bottom, 0xC8 normal
+#else
+	0xA0,			// Set SEG/Column Mapping     0xA0 Invert left/right, 0xA1 normal
+	0xC0,			// Set COM/Row Scan Direction 0xC0 Invert top/bottom, 0xC8 normal
+#endif
+	0xA6,			// Set Normal/Inverse Display mode. A6=Normal; A7=Inverse
+	0xA8, 0x3f,		// Set multiplex ratio (0 to 63, height - 1)
+	0xD3, 0x00,		// Set display offset Shift Mapping RAM Counter (0x00~0x3F)
+	0xD5, 0x80,		// Set display clock divide ratio/oscillator frequency (Set Clock as 100 Frames/Sec)
+	0xD9, 0xF1,		// Set pre-charge period: Pre-Charge as 15 Clocks & Discharge as 1 Clock
+	0xDA, 0x12,		// Set com pins hardware configuration: Alternative
+	0xDB, 0x40,		// Set vcomh: VCOM Deselect Level
+	0xA4,			// 0xA4 output follows RAM content; 0xA5 force all ON
+	0x8D, 0x14,		// Charge Pump Setting, 14h = Enable Charge Pump
+	0xAF,			// Set Display ON/OFF - AE=OFF, AF=ON
+} ;
+
+static const uint8_t	SSD1306_Config [] =
+{
+	0xAE,			// Set Display ON/OFF - AE=OFF, AF=ON
+	0x8D, 0x10,		// Charge Pump Setting, 10h = Disble Charge Pump
+	0x40,			// Set start line address, at 0.
+	0x81, 0xF0,		// Set contrast control register
+#if (DISPLAY_FLIP == 0)
+	0xA1,			// Set SEG/Column Mapping     0xA0 Invert left/right, 0xA1 normal
+	0xC8,			// Set COM/Row Scan Direction 0xC0 Invert top/bottom, 0xC8 normal
+#else
+	0xA0,			// Set SEG/Column Mapping     0xA0 Invert left/right, 0xA1 normal
+	0xC0,			// Set COM/Row Scan Direction 0xC0 Invert top/bottom, 0xC8 normal
+#endif
+	0xA6,			// Set Normal/Inverse Display mode. A6=Normal; A7=Inverse
+	0xA8, 0x3F,		// Set multiplex ratio (0 to 63, height - 1)
+	0xD3, 0x00,		// Set display offset. 00 = no offset
+	0xD5, 0xF0,		// Set display clock divide ratio/oscillator frequency, set divide ratio
+	0xD9, 0x22,		// Set pre-charge period (0x22 or 0xF1)
+	0xDA, 0x12,		// Set COM Pins Hardware Configuration - 128x32:0x02,
+	0xDB, 0x20,		// Set Vcomh Deselect Level - 0x00: 0.65 x VCC, 0x20: 0.77 x VCC (RESET), 0x30: 0.83 x VCC
+	0x20, 0x00,		// Set Memory Addressing Mode - 00=Horizontal, 01=Vertical, 02=Page
+	0x2E,			// Deactivate Scroll command
+	0x3F,			// Multiplex 64
+	0xA4,			// 0xA4 output follows RAM content; 0xA5 force all ON
+	0x8D, 0x14,		// Charge Pump Setting, 14h = Enable Charge Pump
+	0xAF,			// Set Display ON/OFF - AE=OFF, AF=ON
+} ;
 
 void displayInit (void)
 {
+	uint32_t		count ;
+	const uint8_t	* pData ;
+
 	csReset () ;
-	spiInit (displaySpi) ;
+//	spiInit (displaySpi) ;	// Already done at initialization (reading flash)
 	spiScreenDmaInit () ;
-	displaySpiTake () ;
-	displayReset() ;	// Reset the display
+	displayReset() ;		// Reset the display
 
-	displayOff () ;	// Power off
-	displayWrCmd (0xAE) ;	// Set Display OFF/ON: (0xAE/0xAF)
-	displayWrCmd (0x02) ;	// set low column address: SH1106=2, SSD1306=0
-	displayWrCmd (0x10) ;	// set high column address
-	displayWrCmd (0x40) ;	// set start line address  Set Mapping RAM Display Start Line (0x00~0x3F)
-	displayWrCmd (0x81) ;	// set contrast control register
-	displayWrCmd (0xCF) ;	//     SEG Output Current Brightness
-	#if (DISPLAY_FLIP == 0)
-	  displayWrCmd (0xA1) ;	// set SEG/Column Mapping     0xA0 Invert left/right, 0xA1 normal
-	  displayWrCmd (0xC8) ;	// Set COM/Row Scan Direction 0xC0 Invert top/bottom, 0xC8 normal
-	#else
-	  displayWrCmd (0xA0) ;	// set SEG/Column Mapping     0xA0 Invert left/right, 0xA1 normal
-	  displayWrCmd (0xC0) ;	// Set COM/Row Scan Direction 0xC0 Invert top/bottom, 0xC8 normal
-	#endif
-	displayWrCmd (0xA6) ;	// set normal display
-	displayWrCmd (0xA8) ;	// set multiplex ratio(1 to 64)
-	displayWrCmd (0x3f) ;	//     1/64 duty
-	displayWrCmd (0xD3) ;	// set display offset Shift Mapping RAM Counter (0x00~0x3F)
-	displayWrCmd (0x00) ;	//     not offset
-	displayWrCmd (0xd5) ;	// set display clock divide ratio/oscillator frequency
-	displayWrCmd (0x80) ;	//     divide ratio, Set Clock as 100 Frames/Sec
-	displayWrCmd (0xD9) ;	// set pre-charge period
-	displayWrCmd (0xF1) ;	//     Pre-Charge as 15 Clocks & Discharge as 1 Clock
-	displayWrCmd (0xDA) ;	// set com pins hardware configuration
-	displayWrCmd (0x12) ;	//     Alternative
-	displayWrCmd (0xDB) ;	// set vcomh
-	displayWrCmd (0x40) ;	//     VCOM Deselect Level
-	displayWrCmd (0x20) ;	// Set Page Addressing Mode (0x00/0x01/0x02)
-	displayWrCmd (0x02) ;	//
-	displayWrCmd (0x8D) ;	// set Charge Pump enable/disable
-	displayWrCmd (0x14) ;	//     Enable (0x10 disable)
-	displayWrCmd (0xA4) ;	// Set Entire Display OFF/ON (0xA4/0xA5)
-	displayWrCmd (0xAF) ;	// Set Display OFF/ON: (0xAE/0xAF)
-	displayOn () ;
-
-	displaySpiGive () ;
+	if (aaSunCfg.displayController != DISPLAY_NONE)
+	{
+		displaySpiTake () ;
+		if (aaSunCfg.displayController == DISPLAY_SH1106)
+		{
+			count = sizeof (SH1106_Config) ;
+			pData = SH1106_Config ;
+		}
+		else
+		{
+			count = sizeof (SSD1306_Config) ;
+			pData = SSD1306_Config ;
+		}
+		for (uint32_t ii = 0 ; ii < count ; ii++)
+		{
+			displayWrCmd (* pData++) ;
+		}
+		displaySpiGive () ;
+	}
 
     cx = 0 ;
     cy = 0 ;
     currentFont = FONT_SMALL ;
 }
 
-//--------------------------------------------------------------------------------
-//--------------------------------------------------------------------------------
-/*
-// Initialization from:
-// https://github.com/wonho-maker/Adafruit_SH1106
-
-#define SH1106_SETCONTRAST 0x81
-#define SH1106_DISPLAYALLON_RESUME 0xA4
-#define SH1106_DISPLAYALLON 0xA5
-#define SH1106_NORMALDISPLAY 0xA6
-#define SH1106_INVERTDISPLAY 0xA7
-#define SH1106_DISPLAYOFF 0xAE
-#define SH1106_DISPLAYON 0xAF
-
-#define SH1106_SETDISPLAYOFFSET 0xD3
-#define SH1106_SETCOMPINS 0xDA
-
-#define SH1106_SETVCOMDETECT 0xDB
-
-#define SH1106_SETDISPLAYCLOCKDIV 0xD5
-#define SH1106_SETPRECHARGE 0xD9
-
-#define SH1106_SETMULTIPLEX 0xA8
-
-//#define SH1106_SETLOWCOLUMN 0x00
-//#define SH1106_SETHIGHCOLUMN 0x10
-
-#define SH1106_SETSTARTLINE 0x40
-
-#define SH1106_MEMORYMODE 0x20
-#define SH1106_COLUMNADDR 0x21
-#define SH1106_PAGEADDR   0x22
-
-#define SH1106_COMSCANINC 0xC0
-#define SH1106_COMSCANDEC 0xC8
-
-#define SH1106_SEGREMAP 0xA0
-
-#define SH1106_CHARGEPUMP 0x8D
-
-#define SH1106_EXTERNALVCC 0x1
-#define SH1106_SWITCHCAPVCC 0x2
-
-void SH1106_command (uint32_t data)
-{
-	displayWrCmd (data) ;
-}
-
-void ada_OLED_Init(void)
-{
-	const uint32_t vccstate = SH1106_SWITCHCAPVCC ;
-
-	SH1106_command (SH1106_DISPLAYOFF) ;					// 0xAE
-	SH1106_command (SH1106_SETDISPLAYCLOCKDIV) ;			// 0xD5
-	SH1106_command (0x80) ;									// the suggested ratio 0x80
-	SH1106_command (SH1106_SETMULTIPLEX) ;				 	// 0xA8
-	SH1106_command (0x3F) ;
-	SH1106_command (SH1106_SETDISPLAYOFFSET) ;				// 0xD3
-	SH1106_command (0x00) ;									// no offset
-
-	SH1106_command (SH1106_SETSTARTLINE | 0x0) ;			// line #0 0x40
-	SH1106_command (SH1106_CHARGEPUMP) ;					// 0x8D
-	if (vccstate == SH1106_EXTERNALVCC)
-	{
-		SH1106_command (0x10) ;
-	}
-	else
-	{
-		SH1106_command (0x14) ;
-	}
-	SH1106_command (SH1106_MEMORYMODE) ;					// 0x20
-	SH1106_command (0x00) ;									// 0x0 act like ks0108
-	SH1106_command (SH1106_SEGREMAP | 0x1) ;
-	SH1106_command (SH1106_COMSCANDEC) ;
-	SH1106_command (SH1106_SETCOMPINS) ;					// 0xDA
-	SH1106_command (0x12) ;
-	SH1106_command (SH1106_SETCONTRAST) ;					// 0x81
-	if (vccstate == SH1106_EXTERNALVCC)
-	{
-		SH1106_command (0x9F) ;
-	}
-	else
-	{
-		SH1106_command (0xCF) ;
-	}
-	SH1106_command (SH1106_SETPRECHARGE) ;					// 0xd9
-	if (vccstate == SH1106_EXTERNALVCC)
-	{
-		SH1106_command (0x22) ;
-	}
-	else
-	{
-		SH1106_command (0xF1) ;
-	}
-	SH1106_command (SH1106_SETVCOMDETECT) ;					// 0xDB
-	SH1106_command (0x40) ;
-	SH1106_command (SH1106_DISPLAYALLON_RESUME) ;			// 0xA4
-	SH1106_command (SH1106_NORMALDISPLAY) ;					// 0xA6
-
-	SH1106_command (SH1106_DISPLAYON) ;						//--turn on oled panel
-}
-*/
 //--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------
 // AdAstra-Soft banner
@@ -937,9 +883,9 @@ static	pulse_t				pulses [PULSE_COUNTER_MAX] ;
 static	const gpioPinDesc_t	inOutDesc  [] =
 {
 	{	'B',	2,	0,	AA_GPIO_MODE_INPUT_DN },	// Input 1 : 3.3V input of J6
-	{	'D',	3,	0,	AA_GPIO_MODE_INPUT },	// Input 2 : 3.3V/5V on expansion connector (E_RX)
-	{	'C',	15,	0,	AA_GPIO_MODE_INPUT },		// Input 3 / pulse counter input J8
-	{	'B',	11,	0,	AA_GPIO_MODE_INPUT },		// Input 4 / pulse counter input J9
+	{	'D',	3,	0,	AA_GPIO_MODE_INPUT_DN },	// Input 2 : 3.3V/5V on expansion connector (E_RX)
+	{	'C',	15,	0,	AA_GPIO_MODE_INPUT_UP },	// Input 3 / pulse counter input J8
+	{	'B',	11,	0,	AA_GPIO_MODE_INPUT_UP },	// Input 4 / pulse counter input J9
 
 	{	'B',	3,	0,	AA_GPIO_MODE_OUTPUT_PP },	// Output 3 : On board relay
 	{	'B',	9,	0,	AA_GPIO_MODE_OUTPUT_PP },	// Output 4 : J3 on expansion connector (E_RX)
@@ -1267,7 +1213,7 @@ static	void	pageVersion (void)
 	temp = aaSnPrintf (lineBuffer, sizeof (lineBuffer), "%s %02u:%02u:%02u", timeDayName[localTime.wd], localTime.hh, localTime.mm, localTime.ss) ;
 	pageLine (2, statusWTest (STSW_TIME_OK) ? NULL : "?", lineBuffer, temp) ;
 
-	temp = iFracDisplay (lineBuffer, computedData.vRms, VOLT_SHIFT, 3, 2) ;
+	temp = iFracFormat (lineBuffer, computedData.vRms, VOLT_SHIFT, 3, 2) ;
 	pageLine (3, "Vrms", lineBuffer, temp) ;
 }
 
@@ -1345,7 +1291,7 @@ static	void	pageDiverter (void)
 	}
 
 	// Diverted power
-	len = iFracDisplay (lineBuffer, computedData.powerDiverted, POWER_DIVERTER_SHIFT, 6, 1) ;
+	len = iFracFormat (lineBuffer, computedData.powerDiverted, POWER_DIVERTER_SHIFT, 6, 1) ;
 	pageLine (3, "W", lineBuffer, len) ;
 }
 
@@ -1358,16 +1304,16 @@ static	void	pagePowerAll (void)
 	displayClear (0) ;
 	displaySetFont (FONT_BIG) ;
 
-	len = iFracDisplay (lineBuffer, computedData.iData[0].powerReal, POWER_SHIFT, 6, 1) ;
+	len = iFracFormat (lineBuffer, computedData.iData[0].powerReal, POWER_SHIFT, 6, 1) ;
 	pageLine (0, "PImp", lineBuffer, len) ;
 
-	len = iFracDisplay (lineBuffer, computedData.powerDiverted, POWER_DIVERTER_SHIFT, 6, 1) ;
+	len = iFracFormat (lineBuffer, computedData.powerDiverted, POWER_DIVERTER_SHIFT, 6, 1) ;
 	pageLine (1, "PDiv e", lineBuffer, len) ;
 
-	len = iFracDisplay (lineBuffer, computedData.iData[1].powerReal, POWER_SHIFT, 6, 1) ;
+	len = iFracFormat (lineBuffer, computedData.iData[1].powerReal, POWER_SHIFT, 6, 1) ;
 	pageLine (2, "PDiv", lineBuffer, len) ;
 
-	len = iFracDisplay (lineBuffer, computedData.iData[2].powerReal, POWER_SHIFT, 6, 1) ;
+	len = iFracFormat (lineBuffer, computedData.iData[2].powerReal, POWER_SHIFT, 6, 1) ;
 	pageLine (3, "PV", lineBuffer, len) ;
 }
 
@@ -1382,13 +1328,13 @@ static	void	pageISensor	(uint32_t ix)
 	displaySetCharPos (0, 0) ;	// x, y
 	displayString (lineBuffer) ;
 
-	len = iFracDisplay (lineBuffer, computedData.iData[ix].iRms, I_SHIFT, 5, 2) ;
+	len = iFracFormat (lineBuffer, computedData.iData[ix].iRms, I_SHIFT, 5, 2) ;
 	pageLine (0, NULL, lineBuffer, len) ;
 
-	len = iFracDisplay (lineBuffer, computedData.iData[ix].powerReal, POWER_SHIFT, 6, 1) ;
+	len = iFracFormat (lineBuffer, computedData.iData[ix].powerReal, POWER_SHIFT, 6, 1) ;
 	pageLine (1, "PR(W)", lineBuffer, len) ;
 
-	len = iFracDisplay (lineBuffer, computedData.iData[ix].powerApp, POWER_SHIFT, 6, 1) ;
+	len = iFracFormat (lineBuffer, computedData.iData[ix].powerApp, POWER_SHIFT, 6, 1) ;
 	pageLine (2, "PA(VA)", lineBuffer, len) ;
 
 	len = aaSnPrintf (lineBuffer, sizeof (lineBuffer), "%d", computedData.iData[ix].cosPhi) ;
@@ -1446,21 +1392,27 @@ static	void	pageTemperature	(void)
 {
 	ds18b20_t	* pTemp = & pTempSensors->sensors [0] ;
 	uint32_t	len ;
-	uint32_t	ii ;
+	uint32_t	ii, nn ;
 	char		label [4] = "T1" ;
 
 	displayClear (0) ;
 	displaySetFont (FONT_BIG) ;
 
+	nn = 0 ;
 	for (ii = 0 ; ii < TEMP_SENSOR_MAX ; ii++)
 	{
 		if (pTemp->rawTemp != DS18X20_INVALID_RAW_TEMP)
 		{
-			len = iFracDisplay (lineBuffer, pTemp->rawTemp, TEMP_SENSOR_SHIFT, 3, 1) ;
+			len = iFracFormat (lineBuffer, pTemp->rawTemp, TEMP_SENSOR_SHIFT, 3, 1) ;
 			label [1] = '1' + ii ;
 			pageLine (ii, label, lineBuffer, len) ;
+			nn++ ;
 		}
 		pTemp++ ;
+	}
+	if (nn == 0)
+	{
+		pageLine (0, "No temperature", NULL, 0) ;
 	}
 }
 

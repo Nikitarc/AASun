@@ -7,6 +7,8 @@
 
 	When		Who	What
 	05/22/23	ac	Creation
+	04/03/24	ac	Add CRC and size of the file system to the super bloc
+					This alows to compare 2 fisystem and detect change
 
 ----------------------------------------------------------------------
 */
@@ -192,6 +194,8 @@ mfsError_t	mfsMount	(mfsCtx_t * pCtx)
 		{
 			pCtx->blockSize   = pSuper->blockSize ;
 			pCtx->blockPower2 = pSuper->blockPower2 ;
+			pCtx->fsCRC       = pSuper->fsCRC ;
+			pCtx->fsSize      = pSuper->fsSize ;
 			err = MFS_ENONE ;
 		}
 	}

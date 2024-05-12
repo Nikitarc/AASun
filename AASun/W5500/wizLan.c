@@ -12,6 +12,8 @@
 	When		Who	What
 	09/03/23	ac	Creation
 	06/09/23	ac	Check W5500 version register: allows to test if the chip is physically present
+	20/03/24	ac	Add ESP32 communication to WIFI
+
 
 
 	BEWARE: In the W5500 ioLibrary the close() function collide with the C standard library one.
@@ -33,7 +35,8 @@
 #include	"AASun.h"
 #include	"spi.h"
 #include	"wizLan.h"
-#include	"util.h"		// For getMacAddres()
+#include	"wifi.h"
+#include	"util.h"		// For getMacAddress()
 
 #include	"mfs.h"
 #include	"w25q.h"
@@ -42,8 +45,11 @@
 #include	"stdbool.h"
 #include	"string.h"
 
+#include	"aautils.h"
 
 static void	telnetFlush (void) ;
+
+static	int8_t			mfsOk ;		// MFS_ENONE if the file system is mounted
 
 //--------------------------------------------------------------------------------
 
@@ -256,10 +262,12 @@ void	wiz_spi_wburst (uint8_t * pBuf, uint16_t len)
 static const uint8_t		sockBufferSize [8] = { 2, 2, 2, 2, 2, 2, 2, 2 } ;
 
 // DATA_BUF_SIZE defined in httpServer.h
-static	uint8_t wizRxBuf[DATA_BUF_SIZE] ;
-static	uint8_t wizTxBuf[DATA_BUF_SIZE] ;
+// wizBuffers is also used by SerEL.c
+static	uint8_t	wizBuffer [DATA_BUF_SIZE * 2] ;
+static	uint8_t * const wizRxBuf = & wizBuffer [0] ;
+static	uint8_t * const wizTxBuf = & wizBuffer [DATA_BUF_SIZE] ;
 
-aaTimerId_t		wiz1secTimerHandle ;
+static	aaTimerId_t		wiz1secTimerHandle ;
 
 extern	mfsCtx_t	wMfsCtx ;	// MFS file system context for http server
 
@@ -318,17 +326,6 @@ void		wizGetCfg			(lanCfg_t * pCfg)
 
 //--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------
-// The states of the telnet protocol state machine
-
-typedef enum
-{
-	TN_ST_IDLE		= 0,	// Idle
-	TN_ST_IAC1,				// 1st IAC received
-	TN_ST_CMD,				// Command received, only 1 byte to receive
-	TN_ST_SB,				// SB received, waiting for IAC
-	TN_ST_IAC2				// 2nd IAC received, waiting for SE
-
-} tnProtoState_t ;
 
 enum
 {
@@ -337,55 +334,45 @@ enum
 	TN_SE		= 240
 } ;
 
-typedef struct
+// The descriptor for the console "telnet" server
+
+telnetDesc_t	telnetDesc =
 {
-	int8_t			sn ;	// Socket number
-	uint32_t		flags ;
-	tnProtoState_t	tnState ;
+	0,					// sn
+	0,					// flags
+	TN_ST_IDLE,
 
-	// Buffers management
-	uint16_t		txSize, txMask ;
-	uint16_t		iTxRead, iTxWrite, txCount ;
-	uint16_t		rxSize, rxMask ;
-	uint16_t		iRxRead, iRxWrite, rxCount ;
-	uint8_t			* pTxBuffer ;
-	uint8_t			* pRxBuffer ;
+	{ 0 },				// txBuffer
+	{ 0 },				// rxBuffer
 
-	aaDriverDesc_t	txList ;		// The list of tasks waiting for Tx
-	aaDriverDesc_t	rxList ;		// The list of tasks waiting for Rx
-
-} wSock_t ;
-
-// The socket  descriptor for the console "telnet" server
+	{ { NULL, NULL } },	// txWriteList
+	{ { NULL, NULL } },	// rxReadList
+	{ { NULL, NULL } },	// rxWriteList
+} ;
 
 STATIC	uint8_t		wcTxBuffer [SOCK_TX_SIZE] ;
 STATIC	uint8_t		wcRxBuffer [SOCK_RX_SIZE] ;
 
-STATIC	wSock_t		wConsole =
-{
-	0,
-	0,
-	TN_ST_IDLE,
-
-	SOCK_TX_SIZE, SOCK_TX_SIZE-1,
-	0, 0, 0,
-	SOCK_RX_SIZE, SOCK_RX_SIZE-1,
-	0, 0, 0,
-	wcTxBuffer,
-	wcRxBuffer,
-
-	{ { NULL, NULL } },	// txList
-	{ { NULL, NULL } },	// rxList
-} ;
-
 // Descriptor to set the socket as standard I/O
 static	aaDevIo_t	wSockIo ;
+
+static	uint32_t	tnProtocol (telnetDesc_t * pTnDesc) ;
+
+bool				bTelneInUse ;	// True if Telnet is in use
+bool				bWifiTelnet	;	// True if WIFI Telnet in use, else W5500 Telnet
+
+//--------------------------------------------------------------------------------
+
+uint8_t *		getWizBuffer	(void)
+{
+	return wizBuffer ;
+}
 
 //--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------
 // Returns the connected state of the telnet socket
 
-static	bool	wCheckConnected (wSock_t * pSock)
+static	bool	wCheckConnected (telnetDesc_t * pTnDesc)
 {
 	uint8_t		tmp ;
 	bool		bConnected = true ;
@@ -395,24 +382,24 @@ static	bool	wCheckConnected (wSock_t * pSock)
 	if ((tmp & PHYCFGR_LNK_ON) == 0)
 	{
 		// Link down
-		closesocket (pSock->sn) ;
+		closesocket (pTnDesc->sn) ;
 		bConnected = false ;
 	}
 	else
 	{
 		// Check for disconnection
-		tmp = getSn_SR (pSock->sn) ;
+		tmp = getSn_SR (pTnDesc->sn) ;
 		if (tmp != SOCK_ESTABLISHED)
 		{
 			if (tmp == SOCK_CLOSE_WAIT)
 			{
 				// Close initiated by the client
-				disconnect (pSock->sn) ;	// This closes the socket
+				disconnect (pTnDesc->sn) ;	// This closes the socket
 				bConnected = false ;
 			}
 			else
 			{
-				closesocket (pSock->sn) ;
+				closesocket (pTnDesc->sn) ;
 				bConnected = false ;
 			}
 		}
@@ -421,18 +408,18 @@ static	bool	wCheckConnected (wSock_t * pSock)
 }
 
 //--------------------------------------------------------------------------------
-// Copy data from the W5500 socket buffer to the RX circular buffer
-// Copy data using iRxWrite (write to the RX circular buffer)
+// Copy data from the W5500 socket buffer to the RX ring buffer
+// Copy data using iRxWrite (write to the RX ring buffer)
 
-static	uint32_t	wRecv (wSock_t * pSock)
+static	uint32_t	wRecv (telnetDesc_t * pTnDesc)
 {
 	uint32_t	freeSize ;		// Free size in receive buffer
 	uint32_t	dataSize ;		// Data length to read in the socket
 	uint32_t	len ;
-	uint32_t	iWrite ;		// Write index in RX buffer
+	uint32_t	chunkSize ;
 
-	freeSize = pSock->rxSize - pSock->rxCount ;
-	dataSize = getSn_RX_RSR (pSock->sn) ;	// Amount of data available in the socket
+	freeSize = rbGetWriteCount (& pTnDesc->rxBuffer) ;
+	dataSize = getSn_RX_RSR (pTnDesc->sn) ;	// Amount of data available in the socket
 
 	if (dataSize > freeSize)
 	{
@@ -444,11 +431,12 @@ static	uint32_t	wRecv (wSock_t * pSock)
 	}
 	// Now dataSize is the length to read from the socket
 
-	iWrite = pSock->iRxWrite ;
-	if ((iWrite + dataSize) <= pSock->rxSize)
+	chunkSize = rbWriteChunkSize (& pTnDesc->rxBuffer) ;
+	if (chunkSize >= dataSize)
 	{
-		// It can be written at once
-		len = recv (pSock->sn, & pSock->pRxBuffer [iWrite], dataSize) ;
+		// It can be read at once
+		len = recv (pTnDesc->sn, ( uint8_t *) rbGetWritePtr (& pTnDesc->rxBuffer), dataSize) ;
+		rbAddWrite (& pTnDesc->rxBuffer, dataSize) ;
 if (len != dataSize)
 {
 	aaPuts ("wRecv error\n") ;
@@ -458,12 +446,13 @@ if (len != dataSize)
 	}
 	else
 	{
-		// Wrap at the buffer end
-		len = pSock->rxSize - iWrite ; // Write from iRxWrite to the end of the buffer
-		len = recv (pSock->sn, & pSock->pRxBuffer [iWrite], len) ;
+		// Wrap at the buffer end: write 1st part until the buffer end
+		len = recv (pTnDesc->sn, ( uint8_t *) rbGetWritePtr (& pTnDesc->rxBuffer), chunkSize) ;
+		rbAddWrite (& pTnDesc->rxBuffer, chunkSize) ;
 
-		// Write the second part (at the beginning of the buffer)
-		len += recv (pSock->sn, pSock->pRxBuffer, dataSize - len) ;
+		// Write the 2nd part (at the beginning of the buffer)
+		len += recv (pTnDesc->sn, ( uint8_t *) rbGetWritePtr (& pTnDesc->rxBuffer), dataSize - chunkSize) ;
+		rbAddWrite (& pTnDesc->rxBuffer, dataSize - chunkSize) ;
 if (len != dataSize)
 {
 	aaPuts ("wRecv error\n") ;
@@ -472,39 +461,30 @@ if (len != dataSize)
 }
 	}
 
-	aaCriticalEnter () ;
-	pSock->rxCount += dataSize ;
-	pSock->iRxWrite = (iWrite + dataSize) & pSock->rxMask ;
-	aaCriticalExit () ;
-
 	// If some task is waiting to receive awake it
-	aaCriticalEnter () ;
-	if (aaIsIoWaitingTask (& pSock->rxList) != 0u)
-	{
-		// A thread is waiting for RX char, awake it
-		(void) aaIoResume (& pSock->rxList) ;
-	}
-	aaCriticalExit () ;
+	aaIoResumeWaitingTask (& pTnDesc->rxReadList) ;
 
 	return dataSize ;
 }
 
 //--------------------------------------------------------------------------------
-// Copy data from the TX circular buffer to the W5500 socket buffer
-// Copy data using iTxRead (read from the TX circular buffer)
+// Copy data from the TX ring buffer to the W5500 socket buffer
+// Copy data using iTxRead (read from the TX ring buffer)
 
-static	uint32_t	wSend (wSock_t * pSock)
+static	uint32_t	wSend (telnetDesc_t * pTnDesc)
 {
-	int32_t		dataSize ;		// Data length to write in the socket
+	uint32_t	dataSize ;		// Data length to write in the socket
+	uint32_t	toSendSize ;
 	int32_t		sentSize ;
 	int32_t		len ;
-	uint32_t	iRead ;
+	uint32_t	chunkSize ;
 
-	dataSize = getSn_TX_FSR (pSock->sn) ;	// free space in socket TX buffer
+	dataSize   = getSn_TX_FSR (pTnDesc->sn) ;	// free space in socket TX buffer
+	toSendSize = rbGetReadCount (& pTnDesc->txBuffer) ;
 
-	if (dataSize > pSock->txCount)
+	if (dataSize > toSendSize)
 	{
-		dataSize = pSock->txCount ;
+		dataSize = toSendSize ;
 	}
 	if (dataSize == 0u)
 	{
@@ -513,52 +493,26 @@ static	uint32_t	wSend (wSock_t * pSock)
 	// Now dataSize is the length to write to the socket
 
 	sentSize = 0 ;
-	iRead = pSock->iTxRead ;
 	// We cannot have 2 send in a row: the second returns an emitted length of 0.
 	while (dataSize > 0)
 	{
-		if ((iRead + dataSize)  <= pSock->txSize)
+		chunkSize = rbReadChunkSize (& pTnDesc->txBuffer) ;
+		if (chunkSize >=  dataSize)
 		{
-			// It can be read at once.
-			len = dataSize ;
+			chunkSize = dataSize ;
 		}
-		else
-		{
-			// Wrap at the buffer end
-			// Copy the 1st part from iTxRead to the end of the buffer
-			len = pSock->txSize - iRead ;
-		}
-		len = send (pSock->sn, & pSock->pTxBuffer [iRead], len) ;
+		len = send (pTnDesc->sn, (uint8_t *) rbGetReadPtr (& pTnDesc->txBuffer), chunkSize) ;
 if (len < 0)
 {
 	AA_ASSERT (0) ;
 }
 		dataSize -= len ;
 		sentSize += len ;
-		iRead = (iRead + len) & pSock->txMask ;
-		if (len == 0)
-		{
-			// Not  sent, we have to wait a bit.
-			aaTaskDelay (1) ;
-		}
-	}
-
-	if (sentSize > 0)
-	{
-		aaCriticalEnter () ;
-		pSock->txCount -= sentSize ;
-		pSock->iTxRead = iRead ;
-		aaCriticalExit () ;
+		rbAddRead (& pTnDesc->txBuffer, len) ;
 	}
 
 	// If some task is waiting to transmit awake it
-	aaCriticalEnter () ;
-	if (aaIsIoWaitingTask (& pSock->txList) != 0u)
-	{
-		// A thread is waiting for RTX char, awake it
-		(void) aaIoResume (& pSock->txList) ;
-	}
-	aaCriticalExit () ;
+	aaIoResumeWaitingTask (& pTnDesc->txWriteList) ;
 
 	return sentSize ;
 }
@@ -569,44 +523,44 @@ if (len < 0)
 //--------------------------------------------------------------------------------
 // To check a flag in the descriptor flags field
 
-__STATIC_INLINE	uint32_t wCheckFlag (wSock_t * pSock, uint32_t flag)
+__STATIC_INLINE	uint32_t wCheckFlag (telnetDesc_t * pTnDesc, uint32_t flag)
 {
-	return ((pSock->flags & flag) == 0u) ? 0u : 1u ;
+	return ((pTnDesc->flags & flag) == 0u) ? 0u : 1u ;
 }
 
 //--------------------------------------------------------------------------------
-//	Set a flag to socket descriptor
+//	Set a flag to telnet descriptor
 
-void	wSetFlag		(sockHandle_t hSock, uint32_t flag, uint32_t bSet)
+void	telnetSetFlag		(telnetHandle_t hTelnet, uint32_t flag, uint32_t bSet)
 {
-	wSock_t 	* pSock = (wSock_t *) hSock ;
+	telnetDesc_t 	* pTnDesc = (telnetDesc_t *) hTelnet ;
 
 	if (bSet == 0u)
 	{
-		pSock->flags &= ~flag ;
+		pTnDesc->flags &= ~flag ;
 	}
 	else
 	{
-		pSock->flags |= flag ;
+		pTnDesc->flags |= flag ;
 	}
 }
 
 //-----------------------------------------------------------------------------
-//	Get a flag from socket descriptor
+//	Get a flag from telnet descriptor
 
-void	wGetFlag		(sockHandle_t hSock, uint32_t * pFlag)
+void	telnetGetFlag		(telnetHandle_t hTelnet, uint32_t * pFlag)
 {
-	wSock_t 	* pSock = (wSock_t *) hSock ;
+	telnetDesc_t 	* pTnDesc = (telnetDesc_t *) hTelnet ;
 
-	* pFlag = pSock->flags ;
+	* pFlag = pTnDesc->flags ;
 }
 
 //--------------------------------------------------------------------------------
-//	To build a socked descriptor to use this socket as standard input/output
+//	To build a descriptor to use this telnet as standard input/output
 
-void	wInitStdDev (aaDevIo_t * pDev, sockHandle_t hSock)
+void	wInitStdDev (aaDevIo_t * pDev, telnetHandle_t hTelnet)
 {
-	pDev->hDev				= hSock ;
+	pDev->hDev				= hTelnet ;
 	pDev->getCharPtr		= wGetChar ;
 	pDev->putCharPtr		= wPutChar ;
 	pDev->checkGetCharPtr	= wCheckGetChar ;
@@ -614,25 +568,69 @@ void	wInitStdDev (aaDevIo_t * pDev, sockHandle_t hSock)
 }
 
 //--------------------------------------------------------------------------------
+
+void	telnetSwitchOn (void)
+{
+	aaPuts ("Switch to Telnet\n") ;
+	telnetSetFlag ((telnetHandle_t) & telnetDesc, WSOCK_FLAG_LFCRLF, 1) ;	// Convert \n to \r\n
+	rbReset (& telnetDesc.txBuffer) ;
+	rbReset (& telnetDesc.rxBuffer) ;
+
+	aaCriticalEnter () ;
+	aaInitStdIn	 (& wSockIo) ;				// Use this devIo for input
+	aaInitStdOut (& wSockIo) ;				// Use this devIo for output
+	aaCriticalExit () ;
+
+	// Request the client to not local echo (for MS Telnet)
+	aaPuts ("\xff\xfd\x2d") ;	// IAC DO SUPPRESS-LOCAL-ECHO
+	aaPuts ("Connected\n") ;
+	bTelneInUse = true ;
+}
+
+//--------------------------------------------------------------------------------
+// telnet connexion closed, switch to UART console
+
+void	telnetSwitchOff (void)
+{
+// TODO: Flush waiting tasks ?
+	aaDevIo_t	* hDevice = aaGetDefaultConsole () ;
+
+	if (hDevice != NULL)
+	{
+		// Restore the default console
+		aaInitStdIn	 (hDevice) ;
+		aaInitStdOut (hDevice) ;
+	}
+	else
+	{
+		// No default console !!!!
+		aaInitStdIn	 (NULL) ;
+		aaInitStdOut (NULL) ;
+	}
+	aaPuts ("Switch to UART\n") ;
+	bTelneInUse = false ;
+}
+
+//--------------------------------------------------------------------------------
 // Get count of char free space to write to dev without blocking
 
-uint32_t	wCheckPutChar		(sockHandle_t hSock)
+uint32_t	wCheckPutChar		(telnetHandle_t hTelnet)
 {
-	wSock_t 	* pSock = (wSock_t *) hSock ;
+	telnetDesc_t 	* pTnDesc = (telnetDesc_t *) hTelnet ;
 
-	return (uint32_t) (pSock->txSize - pSock->txCount) ;
+	return rbGetWriteCount (& pTnDesc->txBuffer) ;
 }
 
 //--------------------------------------------------------------------------------
 // Put one char to device TX FIFO, blocking if FIFO full
 
-void 		wPutChar			(sockHandle_t hSock, char cc)
+void 		wPutChar			(telnetHandle_t hTelnet, char cc)
 {
-	wSock_t 		* pSock = (wSock_t *) hSock ;
+	telnetDesc_t 		* pTnDesc = (telnetDesc_t *) hTelnet ;
 	uint32_t		flagLF = 0u ;
 
 	// If cc is LF, then maybe send CR-LF
-	if (wCheckFlag (pSock, WSOCK_FLAG_LFCRLF) != 0u  &&  cc == '\n')
+	if (wCheckFlag (pTnDesc, WSOCK_FLAG_LFCRLF) != 0u  &&  cc == '\n')
 	{
 		flagLF = 1u ;
 		cc = '\r' ;
@@ -643,10 +641,10 @@ void 		wPutChar			(sockHandle_t hSock, char cc)
 		while (1)
 		{
 			aaCriticalEnter () ;
-			if (pSock->txCount == pSock->txSize)
+			if (rbGetWriteCount (& pTnDesc->txBuffer) == 0)
 			{
 				// Buffer is full, wait. The critical section will be released by aaIoWait().
-				(void) aaIoWait (& pSock->txList, 0u, 0u) ;	// Not ordered, no timeout
+				(void) aaIoWait (& pTnDesc->txWriteList, 0u, 0u) ;	// Not ordered, no timeout
 			}
 			else
 			{
@@ -654,9 +652,7 @@ void 		wPutChar			(sockHandle_t hSock, char cc)
 			}
 		}
 
-		pSock->pTxBuffer [pSock->iTxWrite] = (uint8_t) cc ;
-		pSock->iTxWrite = (pSock->iTxWrite + 1u) & pSock->txMask ;
-		pSock->txCount++ ;
+		rbPut (& pTnDesc->txBuffer, cc) ;
 		aaCriticalExit () ;
 
 		if (flagLF != 0u)
@@ -670,20 +666,85 @@ void 		wPutChar			(sockHandle_t hSock, char cc)
 }
 
 //-----------------------------------------------------------------------------
+//	Returns the count of available characters in RX buffer
+//	Actually if at least 1 char is available
+
+uint32_t	wCheckGetChar (telnetHandle_t hTelnet)
+{
+	telnetDesc_t 	* pTnDesc = (telnetDesc_t *) hTelnet ;
+
+	return tnProtocol (pTnDesc) ;
+}
+
+//--------------------------------------------------------------------------------
+// Get one char from device RX FIFO, blocking if no char available
+
+char 		wGetChar			(telnetHandle_t hTelnet)
+{
+	telnetDesc_t 	* pTnDesc = (telnetDesc_t *) hTelnet ;
+	char		cc ;
+
+	while (1)
+	{
+		aaCriticalEnter () ;
+		if (rbGetReadCount (& pTnDesc->rxBuffer) == 0)
+		{
+			// Buffer is empty. aaIoWait() will release the critical section
+			(void) aaIoWait (& pTnDesc->rxReadList, 0u, 0u) ;	// Not ordered, no timeout
+		}
+		else
+		{
+			if (0 != tnProtocol (pTnDesc))
+			{
+				break ;	// Not empty. Note: exit while inside critical section
+			}
+		}
+	}
+
+	rbGet (& pTnDesc->rxBuffer, & cc) ;
+	aaCriticalExit () ;
+
+	// If some task is waiting to write to the RX buffer awake it
+	aaIoResumeWaitingTask (& pTnDesc->rxWriteList) ;
+
+	return cc ;
+}
+
+//--------------------------------------------------------------------------------
+//	Send a block of data
+
+void	wPutString (telnetHandle_t hTelnet, char * pStr)
+{
+	while (* pStr != 0)
+	{
+		wPutChar (hTelnet, * pStr) ;
+		pStr++ ;
+	}
+
+	// TODO ? To flush the buffer: awake the lan task
+}
+
+//-----------------------------------------------------------------------------
 // Manage (eat) Telnet protocol. See http://www.tcpipguide.com/free/t_TelnetOptionsandOptionNegotiation-4.htm
 // Returns the count or real char available
 
-static	uint32_t tnProtocol (wSock_t * pSock)
+static	uint32_t tnProtocol (telnetDesc_t * pTnDesc)
 {
 	uint32_t	count ;
 	bool		bEnd = false ;
-	uint8_t		cc ;
+	char		cc ;
+
+	if (bWifiTelnet)
+	{
+		// No need of protocol for WIFI Telnet (it is managed by the ESP32)
+		return rbGetReadCount (& pTnDesc->rxBuffer) ;
+	}
 
 	aaCriticalEnter () ;
 
 	while (! bEnd)
 	{
-		if (pSock->rxCount == 0)
+		if (rbGetReadCount (& pTnDesc->rxBuffer) == 0)
 		{
 			// No char available
 			count = 0 ;
@@ -691,19 +752,18 @@ static	uint32_t tnProtocol (wSock_t * pSock)
 		}
 		else
 		{
-			cc = (char) pSock->pRxBuffer [pSock->iRxRead] ;
-			switch (pSock->tnState)
+			rbPeek (& pTnDesc->rxBuffer, & cc) ;
+			switch (pTnDesc->tnState)
 			{
 				case TN_ST_IDLE:	// Idle
 					if (cc == TN_IAC)
 					{
-						pSock->iRxRead = (pSock->iRxRead + 1) & pSock->rxMask ;
-						pSock->rxCount-- ;
-						pSock->tnState = TN_ST_IAC1 ;
+						rbGet (& pTnDesc->rxBuffer, & cc) ;
+						pTnDesc->tnState = TN_ST_IAC1 ;
 					}
 					else
 					{
-						count = pSock->rxCount ;
+						count = rbGetReadCount (& pTnDesc->rxBuffer) ;
 						bEnd = true ;
 					}
 					break ;
@@ -712,52 +772,48 @@ static	uint32_t tnProtocol (wSock_t * pSock)
 					if (cc == TN_IAC)
 					{
 						// Double IAC => this is a standard char
-						pSock->tnState = TN_ST_IDLE ;
-						count = pSock->rxCount ;
+						pTnDesc->tnState = TN_ST_IDLE ;
+						count = rbGetReadCount (& pTnDesc->rxBuffer) ;
 						bEnd = true ;
 					}
 					else
 					{
-						pSock->iRxRead = (pSock->iRxRead + 1) & pSock->rxMask ;
-						pSock->rxCount-- ;
+						rbGet (& pTnDesc->rxBuffer, & cc) ;
 						if (cc == TN_SB)
 						{
-							pSock->tnState = TN_ST_SB ;
+							pTnDesc->tnState = TN_ST_SB ;
 						}
 						else
 						{
-							pSock->tnState = TN_ST_CMD ;
+							pTnDesc->tnState = TN_ST_CMD ;
 						}
 					}
 					break ;
 
 				case TN_ST_CMD:		// Command received, waiting for the value
-					pSock->iRxRead = (pSock->iRxRead + 1) & pSock->rxMask ;
-					pSock->rxCount-- ;
-					pSock->tnState = TN_ST_IDLE ;	// End of command
+					rbGet (& pTnDesc->rxBuffer, & cc) ;
+					pTnDesc->tnState = TN_ST_IDLE ;	// End of command
 					break ;
 
 				case TN_ST_SB:		// SB received, waiting for IAC
-					pSock->iRxRead = (pSock->iRxRead + 1) & pSock->rxMask ;
-					pSock->rxCount-- ;
+					rbGet (& pTnDesc->rxBuffer, & cc) ;
 					if (cc == TN_IAC)
 					{
-						pSock->tnState = TN_ST_IAC2 ;
+						pTnDesc->tnState = TN_ST_IAC2 ;
 					}
 					break ;
 
 				case TN_ST_IAC2:	// 2nd IAC received, waiting for SE
-					pSock->iRxRead = (pSock->iRxRead + 1) & pSock->rxMask ;
-					pSock->rxCount-- ;
+					rbGet (& pTnDesc->rxBuffer, & cc) ;
 					if (cc == TN_IAC)
 					{
 						// Double IAC => this is a sub negotiation data
-						pSock->tnState = TN_ST_SB ;
+						pTnDesc->tnState = TN_ST_SB ;
 					}
 					if (cc == TN_SE)
 					{
 						// End of sub negotiation data
-						pSock->tnState = TN_ST_IDLE ;
+						pTnDesc->tnState = TN_ST_IDLE ;
 					}
 					else
 					{
@@ -775,74 +831,8 @@ static	uint32_t tnProtocol (wSock_t * pSock)
 	return count ;
 }
 
-//-----------------------------------------------------------------------------
-//	Returns the count of available characters in RX buffer
-//	Actually if at least 1 char is available
-
-uint32_t	wCheckGetChar (sockHandle_t hSock)
-{
-	wSock_t 	* pSock = (wSock_t *) hSock ;
-
-//	return pSock->rxCount  ;
-	return tnProtocol (pSock) ;
-}
-
 //--------------------------------------------------------------------------------
-// Get one char from device RX FIFO, blocking if no char available
-
-char 		wGetChar			(sockHandle_t hSock)
-{
-	wSock_t 	* pSock = (wSock_t *) hSock ;
-	char		cc ;
-
-	while (1)
-	{
-		aaCriticalEnter () ;
-		if (pSock->rxCount == 0u)
-		{
-			// Buffer is empty. aaIoWait() will release the critical section
-			(void) aaIoWait (& pSock->rxList, 0u, 0u) ;	// Not ordered, no timeout
-		}
-		else
-		{
-			if (0 != tnProtocol (pSock))
-			{
-				break ;	// Not empty. Note: exit while inside critical section
-			}
-		}
-	}
-
-	cc = (char) pSock->pRxBuffer [pSock->iRxRead] ;
-	pSock->iRxRead = (pSock->iRxRead + 1) & pSock->rxMask ;
-	pSock->rxCount-- ;
-	aaCriticalExit () ;
-
-	return cc ;
-}
-
-//--------------------------------------------------------------------------------
-//	Send a block of data
-
-void	wPutString (sockHandle_t hSock, char * pStr)
-{
-	while (* pStr != 0)
-	{
-		wPutChar (hSock, * pStr) ;
-		pStr++ ;
-	}
-
-	// TODO ? To flush the buffer: awake the lan task
-}
-
-//--------------------------------------------------------------------------------
-
-const uint8_t *	wGetMacAddress		(void)
-{
-	return (const uint8_t *) netConfiguration.mac ;
-}
-
-//--------------------------------------------------------------------------------
-//	Telnet state machine
+//	Telnet state machine for wired LAN interface (W5500)
 
 typedef enum
 {
@@ -852,99 +842,84 @@ typedef enum
 	tnConnect,
 	tnXfer,
 
-} tnConState_t ;
+} tnW5500State_t ;
 
-static	tnConState_t	telnetState ;	// Default state tnNotInit
+static	tnW5500State_t	telnetW5500State ;	// Default state tnNotInit
 
-void	telnet ()
+void	telnetNext ()
 {
-	switch (telnetState)
+	switch (telnetW5500State)
 	{
 		case tnNotInit:
-			// Telnet: Initialize the wLan descriptor
-			wConsole.flags    = 0 ;
-			wConsole.iTxRead  = 0 ;
-			wConsole.iTxWrite = 0 ;
-			wConsole.txCount  = 0 ;
-			wConsole.iRxRead  = 0 ;
-			wConsole.iRxWrite = 0 ;
-			wConsole.rxCount  = 0 ;
-			aaIoDriverDescInit (& wConsole.txList) ;
-			aaIoDriverDescInit (& wConsole.rxList) ;
+
+			telnetDesc.flags    = 0 ;
+			rbInit (& telnetDesc.txBuffer, SOCK_TX_SIZE, wcTxBuffer) ;
+			rbInit (& telnetDesc.rxBuffer, SOCK_RX_SIZE, wcRxBuffer) ;
+			aaIoDriverDescInit (& telnetDesc.txWriteList) ;
+			aaIoDriverDescInit (& telnetDesc.rxReadList) ;
+			aaIoDriverDescInit (& telnetDesc.rxWriteList) ;
 
 			// Initialize the wLan I/O descriptor
-			wInitStdDev (& wSockIo, (sockHandle_t) & wConsole) ;
-			telnetState = tnOpen ;
+			wInitStdDev  (& wSockIo, (telnetHandle_t) & telnetDesc) ;	// Initialize the devIo with telnet functions
+			telnetW5500State = tnOpen ;
 			break ;
 
 		case tnOpen:
 			// Open socket
-			wConsole.sn = socket (TELNET_SOCK_NUM, Sn_MR_TCP, TELNET_PORT, 0) ;
-			if (wConsole.sn < 0)
+			telnetDesc.sn = socket (TELNET_SOCK_NUM, Sn_MR_TCP, TELNET_PORT, 0) ;
+			if (telnetDesc.sn < 0)
 			{
 				aaPuts ("socket: " ) ;
-				aaPuts (socketErrorMsg [-wConsole.sn]) ;
+				aaPuts (socketErrorMsg [-telnetDesc.sn]) ;
 				aaPutChar('\n') ;
 				aaTaskDelay (100) ;
 				AA_ASSERT (0) ;
 			}
-			telnetState = tnListen ;
+			telnetW5500State = tnListen ;
 			break ;
 
 		case tnListen:
 			// Set socket in listen state
-			if (listen (wConsole.sn) == SOCK_OK)
+			if (listen (telnetDesc.sn) == SOCK_OK)
 			{
-				telnetState = tnConnect ;
+				telnetW5500State = tnConnect ;
 			}
 			break ;
 
 		case tnConnect:
 			// Waiting connection
-			if (getSn_SR (wConsole.sn) == SOCK_ESTABLISHED)
+			if (getSn_SR (telnetDesc.sn) == SOCK_ESTABLISHED)
 			{
-				// Connection established: switch to wLan console
-				aaPuts ("Switch to Telnet\n") ;
-				wSetFlag ((sockHandle_t) & wConsole, WSOCK_FLAG_LFCRLF, 1) ;	// Convert \n to \r\n
-				wInitStdDev  (& wSockIo, (sockHandle_t) & wConsole) ;			// Initialize the devIo with wLan functions
-				aaInitStdIn	 (& wSockIo) ;				// Use this devIo for input
-				aaInitStdOut (& wSockIo) ;				// Use this devIo for output
-
-				// Request the client to not local echo (for MS Telnet)
-				aaPuts ("\xff\xfd\x2d") ;	// IAC DO SUPPRESS-LOCAL-ECHO
-				aaPuts ("Connected\n") ;
-				telnetState = tnXfer ;
+				if (bTelneInUse)
+				{
+					// WIFI Telnet already in use, close the connection
+					closesocket (telnetDesc.sn) ;
+					telnetW5500State = tnOpen ;
+				}
+				else
+				{
+					// Connection established: switch to telnet console
+					telnetSwitchOn () ;
+					bWifiTelnet = false ;
+					telnetW5500State = tnXfer ;
+				}
 			}
 			break ;
 
 		case tnXfer:
 			// Something to receive ?
-			wRecv (& wConsole) ;
+			wRecv (& telnetDesc) ;
 
 			// Something to send ?
-			wSend (& wConsole) ;
+			wSend (& telnetDesc) ;
 
 			// Check socket connected state
-			if (false == wCheckConnected (& wConsole))
+			if (false == wCheckConnected (& telnetDesc))
 			{
 				// Socket disconnected and possibly closed
 				// Switch to UART console then go to open the socket
-// TODO: Flush waiting tasks ?
-				aaDevIo_t	* hDevice = aaGetDefaultConsole () ;
-				if (hDevice != NULL)
-				{
-					// Restore the default console
-					aaInitStdIn	 (hDevice) ;
-					aaInitStdOut (hDevice) ;
-				}
-				else
-				{
-					// No default console !!!!
-					aaInitStdIn	 (NULL) ;
-					aaInitStdOut (NULL) ;
-				}
-				aaPuts ("Switch to UART\n") ;
-				telnetState = tnOpen ;
+				telnetSwitchOff () ;
+				telnetW5500State = tnOpen ;
 			}
 			break ;
 
@@ -959,17 +934,30 @@ void	telnet ()
 
 static	void	telnetFlush (void)
 {
-	if (telnetState == tnXfer)
+	if (bWifiTelnet == true)
 	{
-
-		while (wConsole.txCount > 0)
+		// WIFI
+// TODO
+	}
+	else
+	{
+		// W5500 wired LAN
+		if (telnetW5500State == tnXfer)
 		{
-			telnet () ;
+			while (rbGetReadCount (& telnetDesc.txBuffer) > 0)
+			{
+				telnetNext () ;
+			}
 		}
 	}
 }
 
 //--------------------------------------------------------------------------------
+
+const uint8_t *	wGetMacAddress		(void)
+{
+	return (const uint8_t *) netConfiguration.mac ;
+}
 
 //--------------------------------------------------------------------------------
 //	The lan task
@@ -1030,13 +1018,14 @@ static	const char	* name ;
 
 // Server is 0 (primary), or 1 (alternate)
 // The domainName must remain valid until the end of the operation
-// If domainName is NULL, then use memorized domainName pointer
+// If domainName is NULL, then use the memorized domainName pointer
 
-uint32_t	dnsRequest (uint32_t server, const char * domainName, dnsCb_t dnsCb)
+uint32_t	timeDnsRequest (uint32_t server, const char * domainName, dnsCb_t dnsCb)
 {
-aaPrintf ("dnsRequest %u\n", server) ;
+aaPrintf ("timeDnsRequest %u ", server) ;
 	if (dnsState != DNS_ST_IDLE)
 	{
+aaPutChar ('\n') ;
 		return 0 ;	// DNS not in idle state
 	}
 	if (domainName != NULL)
@@ -1045,8 +1034,11 @@ aaPrintf ("dnsRequest %u\n", server) ;
 	}
 	if (name [0] == 0)
 	{
+		aaPutChar ('\n') ;
 		return 0 ;	// No domain name
 	}
+aaPuts (name) ; aaPutChar ('\n') ;
+
 	dnsCbtoCall = dnsCb ;
 	DNS_start ((server == 0) ? netConfiguration.dns : dnsAlternate, (const uint8_t *) name) ;
 	dnsState = (server == 0) ? DNS_ST_WAIT1 : DNS_ST_WAIT2 ;
@@ -1128,18 +1120,17 @@ void	sntpNext (void)
 	}
 }
 
-uint32_t	sntpDateToSecond	(localTime_t * pTime)
-{
-	// Because localTime_t and datetime have the same content
-	return changedatetime_to_seconds ((datetime *) pTime) ;
-}
-
-uint32_t	sntpSecondToWd		(uint32_t seconds)
-{
-	return ((seconds / SECS_PERDAY) + 6u) % 7u ;
-}
-
 //--------------------------------------------------------------------------------
+// When the console link is used for SerEl (web page download) it is necessary to get exclusive use of this link.
+// Setting bLowProcessEnabled to false disable the low process task, so it can't generate outputs
+
+static	bool bLowProcessEnabled ;
+
+void	enableLowProcesses	(bool enable)
+{
+	bLowProcessEnabled = enable ;
+}
+
 //--------------------------------------------------------------------------------
 // This task handles the local network and other low priority processes
 
@@ -1147,7 +1138,6 @@ void	lowProcessesTask (uintptr_t arg)
 {
 	int8_t		tmp ;
 	int8_t		seqnum ;
-	int8_t		mfsOk ;
 
 	(void) arg ;
 
@@ -1201,6 +1191,10 @@ void	lowProcessesTask (uintptr_t arg)
 	{
 		aaPrintf ("mfsMount error: %d\n", mfsOk) ;
 	}
+	else
+	{
+		aaPrintf ("mfsMount Ok  Size:%u, Crc:0x%08X\n", wMfsCtx.fsSize, wMfsCtx.fsCRC) ;
+	}
 
 	httpServer_init (wizTxBuf, wizRxBuf, HTTP_SOCK_MAX, httpSocknumlist) ;
 	reg_httpServer_cbfunc(NVIC_SystemReset, NULL);
@@ -1234,17 +1228,26 @@ for (uint32_t ii = 0 ; ii < 4 ; ii++)
 aaPutChar('\n') ;
 */
 	// Initialize state machines
-	telnetState = tnNotInit ;
+	telnetW5500State = tnNotInit ;
+	telnetNext () ;		// To initialize the Telnet  descriptor
+
 	dnsState = DNS_ST_IDLE ;
 	sntpRunning = 0u ;
 	seqnum = 0 ;
 
 	DNS_init (DNS_SOCK_NUM, wizTxBuf) ;
 
-	// This loop manage the telnet connection, http server, DNS request, SNTP, temperature sensors, etc
+	// Initialize communication with ESP32 that handle WIFI
+	wifiInit () ;
+
+	// This loop manage the Telnet connections (wired and WIFI), HTTP server, DNS request, SNTP, temperature sensors, etc
 	while (1)
 	{
 		aaTaskDelay (3) ;
+		if (bLowProcessEnabled == false)
+		{
+			continue ;
+		}
 
 		tmp = 0 ;
 		ctlwizchip (CW_GET_PHYLINK, (void *) & tmp) ;
@@ -1253,11 +1256,11 @@ aaPutChar('\n') ;
 if (statusWTest (STSW_NET_LINK_OFF)) aaPrintf ("STSW_NET_LINK_ON\n") ;	// Print only once
 			statusWClear (STSW_NET_LINK_OFF) ;
 
-			telnet () ;
+			telnetNext () ;
 			dnsNext () ;
 			sntpNext () ;
 
-			// If the file system is mounted, then manage http
+			// If the file system is mounted, then manage HTTP
 			if (mfsOk == MFS_ENONE)
 			{
 				httpServer_run (seqnum++) ;
@@ -1273,6 +1276,8 @@ if (! statusWTest (STSW_NET_LINK_OFF)) aaPrintf ("STSW_NET_LINK_OFF\n") ;	// Pri
 			statusWSet (STSW_NET_LINK_OFF) ;
 		}
 
+		wifiNext () ;
+
 		tempSensorNext () ;
 
 		displayYesterdayHisto (1, 0) ;
@@ -1281,12 +1286,13 @@ if (! statusWTest (STSW_NET_LINK_OFF)) aaPrintf ("STSW_NET_LINK_OFF\n") ;	// Pri
 
 //--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------
-// Create the lan task
+// Create the task for local network and other low priority processes
 // With a low priority: mandatory lower than the AASun task
 
 void	lowProcessesInit (void)
 {
-	// Create the wLan task
+	bLowProcessEnabled = true ;
+
 	aaTaskCreate (
 		WLAN_TASK_PRIORITY,			// Task priority
 		"tLan",						// Task name
@@ -1297,7 +1303,7 @@ void	lowProcessesInit (void)
 		AA_FLAG_STACKCHECK,			// Flags
 		NULL) ;						// Created task id
 
-	aaTaskDelay (50) ;	// Allows the lan task to start
+	aaTaskDelay (50) ;	// Allows the task to start
 }
 
 //--------------------------------------------------------------------------------

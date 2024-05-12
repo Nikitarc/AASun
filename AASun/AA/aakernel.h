@@ -259,6 +259,7 @@ __STATIC_INLINE void		aaIoDriverDescInit	(aaDriverDesc_t * pDriverDesc)
 
 aaError_t	aaIoWait				(aaDriverDesc_t * pDriverDesc, uint32_t bOrdered, uint32_t timeOut) ;
 aaTcb_t *	aaIoResume				(aaDriverDesc_t * pDriverDesc) ;
+aaTcb_t *	aaIoResumeWaitingTask	(aaDriverDesc_t * pDriverDesc) ;
 
 //--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------

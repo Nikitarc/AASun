@@ -222,6 +222,7 @@ backButton.addEventListener("click", () => {
 // Set footer text
 document.getElementById("footerText").innerHTML = common.getFooterString () ;
 
+// Triggers 1st data update
 setTimeout(() => {
      updateData (false, true) ;
    }, "200");

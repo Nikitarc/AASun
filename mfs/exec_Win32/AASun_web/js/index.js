@@ -158,9 +158,34 @@ variableButton.addEventListener("click", () => {
 getServerData ("version.cgi").then (data => {
     if (data != null)
     {
-        let soft = Number (data ["soft"]) ;
+        let soft   = Number (data ["soft"]) ;
+        let wifi   = Number (data ["wifi"]) ;
+        let wifiAP = Number (data ["wifiAP"]) ;
+
         document.getElementById("softVersion").innerHTML = Math.round(soft / 65536) + '.' + Math.round(soft % 65536);
         document.getElementById("httpVersion").innerHTML = common.versionString ;
+
+        if (wifi == 0)
+        {
+            // No WIFI ou unknown version
+            document.getElementById("wifiVersion").innerHTML = "-";
+            document.getElementById("wifiMode").innerHTML = "-" ; 
+        }
+        else
+        {
+            document.getElementById("wifiVersion").innerHTML = Math.round(wifi / 65536) + '.' + Math.round(wifi % 65536);
+
+            if (wifiAP != 0)
+            {
+                // Graph not available in AP mode
+                graphButton.setAttribute("disabled", "disabled");
+                document.getElementById("wifiMode").innerHTML = "Access Point" ; 
+            }
+            else
+            {
+                document.getElementById("wifiMode").innerHTML = "Station" ; 
+            }
+        }
     }
 }) ;
 

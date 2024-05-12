@@ -32,7 +32,7 @@
 // #define	BSP_BUTTON0_ATTR			(AA_GPIO_PULL_UP)
 // #define	BSP_OUTPUT0_ATTR			(AA_GPIO_OPEN_DRAIN | AA_GPIO_PULL_UP)
 
-// Theses pins are for: AA_SUN board + Expansion PCB
+// Theses pins are for: AA_SUN board V1 + Expansion PCB
 // LED
 #define BSP_LED0_PORT_NUMBER		(1)	// 0 is port A
 #define BSP_LED0_PIN_NUMBER			(12)

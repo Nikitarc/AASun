@@ -117,26 +117,6 @@ console.log ("getServerData " + urldata) ;
 
 //------------------------------------------------------------------
 //------------------------------------------------------------------
-// setConfig.cgi message ID
-const midWrite              = 0 ;
-const midDivOnOff           = 1 ;
-const midRes1               = 2 ;     // Reserved
-const midRes2               = 3 ;     // Reserved
-const midVolt               = 4 ;
-const midCurrent            = 5 ;
-const midPower              = 6 ;
-const midDiverter           = 7 ;
-const midCoef               = 8 ;
-const midCounter            = 9 ;
-const midLan                = 10 ;
-const midFp                 = 11 ;
-const midEnergyNames        = 12 ;
-const midDivertingRule      = 13 ;
-const midForcingRules       = 14 ;
-const midForcingManual      = 15 ;
-const midResetEnergyTotal   = 16 ;
-const midSetVar			    = 17 ;
-const midSetAl			    = 18 ;
 
 const sendVoltButton = document.getElementById("sendVolt") ;
 sendVoltButton.addEventListener("click", sendVoltButtonClick);
@@ -153,9 +133,9 @@ console.log ("sendVolt click") ;
     else
     {
         let string = "{" +
-        '"mid":"'      + midVolt  + '",' +
-        '"vCal":"'     + vCal     + '",' +
-        '"phaseCal":"' + phaseCal + '"}' ;
+        '"mid":"'      + common.midVolt  + '",' +
+        '"vCal":"'     + vCal            + '",' +
+        '"phaseCal":"' + phaseCal        + '"}' ;
         sendToServer ("setConfig.cgi", JSON.parse (string), true).then (array => {
                 if (array !== null)
                 {
@@ -222,23 +202,23 @@ console.log ("sendCurrent click") ;
     if (Ok)
     {
         let string =
-            '{"mid":"'      + midCurrent + '"' +
-            ',"i1Cal":"'    + i1Cal      + '"' +
-            ',"i1Offset":"' + i1Offset   + '"' +
-            ',"i2Cal":"'    + i2Cal      + '"' +
-            ',"i2Offset":"' + i2Offset   + '"' ;
+            '{"mid":"'      + common.midCurrent + '"' +
+            ',"i1Cal":"'    + i1Cal             + '"' +
+            ',"i1Offset":"' + i1Offset          + '"' +
+            ',"i2Cal":"'    + i2Cal             + '"' +
+            ',"i2Offset":"' + i2Offset          + '"' ;
 
         if (hasCT3)
         {
             string +=
-            ',"i3Cal":"'   + i3Cal       + '"' +
-            ',"i3Offset":"' + i3Offset   + '"' ;
+            ',"i3Cal":"'   + i3Cal              + '"' +
+            ',"i3Offset":"' + i3Offset          + '"' ;
         }
         if (hasCT4)
         {
             string +=
-            ',"i4Cal":"'   + i4Cal       + '"' +
-            ',"i4Offset":"' + i4Offset   + '"' ;
+            ',"i4Cal":"'   + i4Cal              + '"' +
+            ',"i4Offset":"' + i4Offset          + '"' ;
         }
         string += '}' ;
         sendToServer ("setConfig.cgi", JSON.parse (string), true).then (array => {
@@ -311,22 +291,22 @@ console.log ("sendPower click") ;
     if (Ok)
     {
         let string =
-            '{"mid":"'      + midPower + '"' +
-            ',"p1Cal":"'    + p1Cal    + '"' +
-            ',"p1Offset":"' + p1Offset + '"' +
-            ',"p2Cal":"'    + p2Cal    + '"' +
-            ',"p2Offset":"' + p2Offset + '"' ;
+            '{"mid":"'      + common.midPower + '"' +
+            ',"p1Cal":"'    + p1Cal           + '"' +
+            ',"p1Offset":"' + p1Offset        + '"' +
+            ',"p2Cal":"'    + p2Cal           + '"' +
+            ',"p2Offset":"' + p2Offset        + '"' ;
         if (hasCT3)
         {
             string +=
-            ',"p3Cal":"'    + p3Cal    + '"' +
-            ',"p3Offset":"' + p3Offset + '"' ;
+            ',"p3Cal":"'    + p3Cal           + '"' +
+            ',"p3Offset":"' + p3Offset        + '"' ;
         }
         if (hasCT4)
         {
             string +=
-            ',"p4Cal":"'    + p4Cal    + '"' +
-            ',"p4Offset":"' + p4Offset + '"' ;
+            ',"p4Cal":"'    + p4Cal           + '"' +
+            ',"p4Offset":"' + p4Offset        + '"' ;
         }
         string += '}' ;
         sendToServer ("setConfig.cgi", JSON.parse (string), true).then (array => {
@@ -352,7 +332,7 @@ sendEnergyNamesButton.addEventListener("click", sendEnergyNamesButtonClick);
 
 function sendEnergyNamesButtonClick()
 {
-    let string = '{"mid":"' + midEnergyNames + '"';
+    let string = '{"mid":"' + common.midEnergyNames + '"';
 console.log ("sendEnergyNamesButtonClick click") ;
 
     string += ',"n0":"' + document.getElementById("eName0").value + '"' ;
@@ -403,13 +383,13 @@ console.log ("sendDiverter click") ;
         else
         {
             let string = "{" +
-            '"mid":"'  + midDiverter  + '",' +
-            '"pMax1":"'    + pMax1    + '",' +
-            '"pVolt1":"'   + pVolt1   + '",' +
-            '"pMargin1":"' + pMargin1 + '",' +
-            '"pMax2":"'    + pMax2    + '",' +
-            '"pVolt2":"'   + pVolt2   + '",' +
-            '"pMargin2":"' + pMargin2 + '"}' ;
+            '"mid":"'  + common.midDiverter  + '",' +
+            '"pMax1":"'    + pMax1           + '",' +
+            '"pVolt1":"'   + pVolt1          + '",' +
+            '"pMargin1":"' + pMargin1        + '",' +
+            '"pMax2":"'    + pMax2           + '",' +
+            '"pVolt2":"'   + pVolt2          + '",' +
+            '"pMargin2":"' + pMargin2        + '"}' ;
             sendToServer ("setConfig.cgi", JSON.parse (string), true).then (array => {
                 if (array !== null)
                 {
@@ -442,11 +422,11 @@ console.log ("sendCoef click") ;
     else
     {
         let string = "{" +
-        '"mid":"'  + midCoef  + '",' +
-        '"cksP":"' + cksP + '",' +
-        '"cksI":"' + cksI + '",' +
-        '"ckdP":"' + ckdP + '",' +
-        '"ckdI":"' + ckdI + '"}' ;
+        '"mid":"'  + common.midCoef + '",' +
+        '"cksP":"' + cksP           + '",' +
+        '"cksI":"' + cksI           + '",' +
+        '"ckdP":"' + ckdP           + '",' +
+        '"ckdI":"' + ckdI           + '"}' ;
         sendToServer ("setConfig.cgi", JSON.parse (string), true).then (array => {
             if (array !== null)
             {
@@ -476,9 +456,9 @@ console.log ("sendCounter click") ;
     else
     {
         let string = "{" +
-        '"mid":"'      + midCounter  + '",' +
-        '"counter1":"' + c1 + '",' +
-        '"counter2":"' + c2 + '"}' ;
+        '"mid":"'      + common.midCounter  + '",' +
+        '"counter1":"' + c1                 + '",' +
+        '"counter2":"' + c2                 + '"}' ;
         sendToServer ("setConfig.cgi", JSON.parse (string), true).then (array => {
             if (array !== null)
             {
@@ -510,7 +490,7 @@ console.log ("sendLan click") ;
     else
     {
         let string = "{" +
-        '"mid":"'   + midLan  + '",' +
+        '"mid":"'   + common.midLan       + '",' +
         '"clip":"'  + ipToInt32 (clip)    + '",' +
         '"clmask":"'+ ipToInt32 (clmask)  + '",' +
         '"clgw":"'  + ipToInt32 (clgw)    + '",' +
@@ -543,8 +523,34 @@ console.log ("sendFp click") ;
     else
     {
         let string = "{" +
-            '"mid":"' + midFp  + '",' +
-            '"cfp":"' + cfp    + '"}' ;
+            '"mid":"' + common.midFp  + '",' +
+            '"cfp":"' + cfp           + '"}' ;
+        sendToServer ("setConfig.cgi", JSON.parse (string), true).then (array => {
+            if (array !== null)
+            {
+                if (array [0] != "OK")
+                {
+                    common.ackDialog ("Server error: ", array [2]) ;
+                }
+            }
+        })
+    }
+}
+
+//------------------------------------------------------------------
+
+const sendDisplay = document.getElementById("sendDisplay") ;
+sendDisplay.addEventListener("click", sendDisplayButtonClick);
+
+function sendDisplayButtonClick()
+{
+    let display = document.getElementById("displaySelect").value ;
+ console.log ("sendDisplay click " + display) ;
+    if (display != "0")
+    {
+        let string = "{" +
+            '"mid":"' + common.midSetDisplay  + '",' +
+            '"display":"' + display   + '"}' ;
         sendToServer ("setConfig.cgi", JSON.parse (string), true).then (array => {
             if (array !== null)
             {
@@ -564,7 +570,7 @@ writeButton.addEventListener("click", writeButtonClick);
 
 function writeButtonClick()
 {
-    sendToServer ("setConfig.cgi", JSON.parse ('{"mid":"' + midWrite + '"}'), false).then (array => {
+    sendToServer ("setConfig.cgi", JSON.parse ('{"mid":"' + common.midWrite + '"}'), false).then (array => {
         if (array !== null)
         {
             if (array [0] == "OK")
@@ -655,6 +661,7 @@ console.log ("displayConfig ", JSON.stringify(data)) ;
             document.getElementById("cldns").value  = int32ToIp (Number (data["cldns"])) ;
     
             document.getElementById("cfp").value = data["cfp"] ;
+            document.getElementById("displaySelect").value = data["display"] ;
     
             document.getElementById("eName0").value = data["n0"] ;
             document.getElementById("eName1").value = data["n1"] ;

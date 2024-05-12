@@ -19,6 +19,10 @@
 #include	"wizLan.h"
 #include	"temperature.h"
 
+#define	DISPLAY_NONE			0
+#define	DISPLAY_SH1106			1	// 1.3"  OLED display with SH1106  controller
+#define	DISPLAY_SSD1306			2	// 0.96" OLED display with SSD1306 controller
+
 #define	I_SENSOR_MAX			4		// Max count of managed current sensors
 #define	I_SENSOR_COUNT			3		// Count of managed current sensors
 
@@ -99,23 +103,28 @@
 
 //--------------------------------------------------------------------------------
 
-#define	CFGPARAM_VERSION	1		// Configuration structure version
-#define	ENERGYCNT_VERSION	1		// Energy counters structure version
+#define	CFGPARAM_VERSION		1		// Configuration structure version
+#define	ENERGYCNT_VERSION		1		// Energy counters structure version
 
 //--------------------------------------------------------------------------------
 
-#define	AASUNVAR_MAX		4		// Count of maintained variables
+#define	AASUNVAR_MAX			4		// Count of maintained variables
 
-#define	ASV_DAYS			0		// Count of running days since power up
-#define	ASV_ANTIL			1		// Anti-legionella counter
-#define	ASV_USER1			2		// User counter 1
-#define	ASV_USER2			3		// User counter 2
+#define	ASV_DAYS				0		// Count of running days since power up
+#define	ASV_ANTIL				1		// Anti-legionella counter
+#define	ASV_USER1				2		// User counter 1
+#define	ASV_USER2				3		// User counter 2
 
 // Anti-legionella: Flags for alFlag in configuration
-#define	AL_FLAG_EN			0x80	// Anti-legionella enabled
-#define	AL_FLAG_INPUT		0x40	// Use Input (else use Temperature)
-#define	AL_FLAG_NUMMASK		0x0F	// Mask to get the temperature index or the input number
+#define	AL_FLAG_EN				0x80	// Anti-legionella enabled
+#define	AL_FLAG_INPUT			0x40	// Use Input (else use Temperature)
+#define	AL_FLAG_NUMMASK			0x0F	// Mask to get the temperature index or the input number
 
+//--------------------------------------------------------------------------------
+
+#define	SNTP_TZ					25	// 25: UTC+01:00 France (metropolitan). This is summer time when Daylight Saving Time is on
+
+//--------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------
 // Energy counters, total or daily
 
@@ -246,7 +255,7 @@ typedef struct
 
 
 //--------------------------------------------------------------------------------
-// Some resources are exclusive (this is no longer true with a modified PCB)
+// Some resources are exclusive (this is no longer true with a modified PCB V1)
 // TODO: to remove when the expansion PCB will be available
 
 #define	OPT_LINKY			0x01
@@ -321,9 +330,9 @@ typedef struct
 	uint8_t			alFlag ;				// Anti-legionella: 0x80=enabled + temperature rank (0 based) or input index (0 based)
 	int8_t			alValue ;				// Anti-legionella temperature threshold or input value
 
+	uint8_t			displayController ;		// Display controller used: one of DISPLAY_XXX
 	uint8_t			reserved1 ;				// Provision for future use
-	uint8_t			reserved2 ;
-	uint32_t		reserved3 [7] ;
+	uint32_t		reserved2 [7] ;
 
 	uint32_t		ckSum ;					// The checksum of the structure
 

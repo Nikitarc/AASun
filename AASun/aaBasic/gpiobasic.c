@@ -15,6 +15,7 @@
 	04/03/21	ac	RCC_GetXxxClockFreq() functions are now static inside stm32l4xx_ll_rcc.c. Sigh...
 	02/06/21	ac	Add AA_GPIO_MODE_ADCSWOPEN	to set analog switch open for STM32H7 PA0, PA1, PC2, PC3
 	28/07/22	ac	Add return value to gpioConfigurePin() and gpioConfigureAndSetPin()
+	07/05/23	ac	Port to STM32C0
 
 ----------------------------------------------------------------------
 */
@@ -98,7 +99,7 @@
 	}
 #endif
 
-#if (defined STM32G0)
+#if (defined STM32G0  ||  defined STM32C0)
 	__ALWAYS_STATIC_INLINE void gpioCockEnable (uint32_t portNum)
 	{
 		RCC->IOPENR |= 1u << portNum ;

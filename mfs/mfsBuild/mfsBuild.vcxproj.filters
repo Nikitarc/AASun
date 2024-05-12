@@ -24,6 +24,9 @@
     <ClCompile Include="..\utils\getopt.c">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
+    <ClCompile Include="src\crc32.c">
+      <Filter>Fichiers sources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\mfs\src\mfs.h">
