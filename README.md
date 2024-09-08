@@ -2,6 +2,8 @@
 
 _The project is documented in French because it was designed according to the characteristics of the Linky meter which is specifically French. The router can, however, be used directly on any 50Hz electrical network._
 
+Ceci est le projet prototype de AASun, qui a permi d'en valider l'architecture et les fonctionnalités.<br>
+Le projet final se trouve dans le repository [AASun-V2](https://github.com/Nikitarc/AASun-V2)
 ## Pourquoi un routeur?
 Une installation solaire peut être utilisée en « Auto Consommation », c’est à dire que l’électricité produite est utilisée localement par le producteur plutôt qu’être vendue.
 Sans équipement spécialisé la consommation est aléatoire :
@@ -55,5 +57,5 @@ Ci dessus le prototype avec toutes les fonctionnalités prévues. La prochaine �
 
 `http` contient le projet Espressif-IDE pour générer l'application du module WIFI "ESP32-C3 Super Mini"
 
-Tous les fichiers du routeur sont fournis sous une forme directement utilisable : Il suffit d’avoir STM32CubeProgrammer et un convertisseur USB/UART pour mettre à jour le routeur.
+Tous les fichiers du routeur sont fournis sous une forme directement utilisable : Il suffit d’avoir installé STM32CubeProgrammer et d'utiliser un convertisseur USB/UART pour mettre à jour le routeur.
 Le logiciel du module WIFI doit être compilé avec Espressif-IDE, qui sert aussi à la téléverser.
